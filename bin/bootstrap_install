@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#source -- "./bin/library/base" || exit 1
+#__set_script_path 1
+#__enable_error_handler
+
+function bootstrap_install() {
+	local url="$1" destination="$2"
+	local temporary_directory status=0 download_url="$url"
+
+	if [[ "$url" =~ ^https://github.com/([^/]+)/([^/]+)/?$ ]]; then
+		local owner="${BASH_REMATCH[1]}" repository="${BASH_REMATCH[2]}"
+		repository="${repository%".git"}"
+		download_url="https://github.com/$owner/$repository/archive/refs/heads/master.zip"
+	fi
+
+	local project
+	project="$(basename -- "$destination")"
+	project="${project//"-"/"_"}"
+	printf -v "__${project}_library_path" '%s/' "$destination"
+
+	if [[ -d "$destination" ]]; then
+		__info "Bootstrapping %s not necessary… skipped." "$project"
+		return 0
+	fi
+
+	temporary_directory="$(__create_temporary_directory)"
+	wget --quiet --output-document "$temporary_directory/archive.zip" -- "$download_url" || status="$(__abort_on_interrupt "$?")"
+	if (( status != 0 )); then
+		[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
+		return "$status"
+	fi
+
+	unzip -q -d "$temporary_directory/extracted" -- "$temporary_directory/archive.zip" || status="$(__abort_on_interrupt "$?")"
+	if (( status != 0 )); then
+		[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
+		return "$status"
+	fi
+
+	mkdir --parents -- "$destination"
+	local entries=("$temporary_directory/extracted/"*)
+	if (( ${#entries[@]} == 1 )) && [[ -d "${entries[0]}" ]]; then
+		mv -- "${entries[0]}/"* "$destination/"
+	else
+		mv -- "$temporary_directory/extracted/"* "$destination/"
+	fi
+
+	cat > "$destination/installation-settings.markdown" <<EOF
+# installation settings
+
+- source url: ${url}
+- download url: ${download_url}
+- install directory: ${destination}
+- installed at: $(date +%d-%m-%Y-%H-%M-%S)
+EOF
+
+	[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
+}
