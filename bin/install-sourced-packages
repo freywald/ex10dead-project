@@ -717,13 +717,11 @@ source_file="$input_file"
 
 if $force_download_newer; then
 	__info "updating from %s" "$input_file"
+elif [[ -f "$pinned_file" && -s "$pinned_file" ]]; then
+	source_file="$pinned_file"
+	__info "requirements are pinned; using %s" "$pinned_file"
 else
-	if [[ -f "$pinned_file" ]]; then
-		source_file="$pinned_file"
-		__info "requirements are pinned; using %s" "$pinned_file"
-	else
-		__info "no pin file; using %s" "$input_file"
-	fi
+	__info "no pin file; using %s" "$input_file"
 fi
 
 mkdir --parents -- "$zip_archive_directory" "$installation_archive_directory" "$(dirname -- "$dynamic_file")"
@@ -776,7 +774,11 @@ while ((${#queue[@]} > 0)); do
 done
 
 mv -f -- "$dynamic_partial" "$dynamic_file"
-mv -f -- "$pinned_partial" "$pinned_file"
+if [[ -s "$pinned_partial" ]]; then
+	mv -f -- "$pinned_partial" "$pinned_file"
+else
+	rm -f -- "$pinned_partial"
+fi
 
 trap - "INT" "TERM"
 
