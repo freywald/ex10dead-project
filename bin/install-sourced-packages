@@ -563,6 +563,22 @@ function process_requirement() {
 			local_exit_failsafe
 		fi
 
+		local entry_tag entry_branch
+		entry_tag="$(get_metadata "tag" "$key")" || entry_tag=""
+		entry_branch="$(get_metadata "branch" "$key")" || entry_branch=""
+		entry_tag="$(__trim_whitespaces "$entry_tag")"
+		entry_branch="$(__trim_whitespaces "$entry_branch")"
+
+		if [[ -n "$entry_tag" ]]; then
+			requirement_tag="$entry_tag"
+			requirement_branch=""
+			requirement_explicit=true
+		elif [[ -n "$entry_branch" ]]; then
+			requirement_branch="$entry_branch"
+			requirement_tag=""
+			requirement_explicit=true
+		fi
+
 		resolve_download
 
 		if (( depth == 0 )) || $update_to_any_depth; then
