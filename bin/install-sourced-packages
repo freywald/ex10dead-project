@@ -12,6 +12,11 @@ function local_exit_failsafe() { __exit_failsafe; exit 1; }
 
 # script task start
 
+if [[ -z "${bootstrap_install_sourced-}" ]]; then
+	source -- "bootstrap_install" || exit 1
+	bootstrap_install_sourced=true
+fi
+
 __info "[%s] installing sourced packages" "__$__current_script_name"
 
 installation_root=""
@@ -26,7 +31,9 @@ update_to_any_depth=false
 declare -A seen=()
 declare -A decided_version=()
 declare -A decided_by=()
-
+if ! declare -p installed_paths &>"/dev/null"; then
+	declare -A installed_paths=()
+fi
 # breadth-first queue of "file<TAB>depth"
 declare -a queue=()
 
@@ -610,6 +617,20 @@ function process_requirement() {
 		identity="$(requirement_identity)"
 		check_conflict "$project" "$identity" "$requester"
 
+		if [[ -n "${installed_paths["$project"]-}" ]]; then
+			target="${installed_paths["$project"]}"
+			__info "already installed at %s, skipping %s" "$target" "$project"
+
+			record_library
+			seen["$project"]="installed"
+
+			local depth_next
+			depth_next="$((depth + 1))" || __expression_may_fail
+			enqueue_nested "$target" "$depth_next"
+
+			continue
+		fi
+
 		if [[ -n "${seen["$project"]-}" ]]; then
 			continue
 		fi
@@ -719,6 +740,7 @@ function process_requirement() {
 
 		record_library
 		seen["$project"]="installed"
+		installed_paths["$project"]="$target"
 
 		local depth_next
 		depth_next="$((depth + 1))" || __expression_may_fail
@@ -726,14 +748,12 @@ function process_requirement() {
 	done
 }
 
-source -- "bootstrap_install" || exit 1
-
 if ! (cd -- "$installation_root");  then
 	__error "cannot cd into installation root: %s" "$installation_root"
 	local_exit_failsafe
 fi
 
-bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/libraries/sourcetree_datafile_format"
+bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/core-library/sourcetree_datafile_format"
 source -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format" || exit 1
 
 input_file="$installation_root/packages.sources"

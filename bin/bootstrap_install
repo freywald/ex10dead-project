@@ -4,6 +4,10 @@
 #__set_script_path 1
 #__enable_error_handler
 
+if ! declare -p installed_paths &>"/dev/null"; then
+	declare -A installed_paths=()
+fi
+
 function bootstrap_install() {
 	local url="$1" destination="$2"
 	local temporary_directory status=0 download_url="$url"
@@ -53,6 +57,8 @@ function bootstrap_install() {
 - install directory: ${destination}
 - installed at: $(date +%d-%m-%Y-%H-%M-%S)
 EOF
+
+	installed_paths["$project"]="$destination"
 
 	[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
 }
