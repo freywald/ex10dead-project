@@ -488,11 +488,30 @@ function process_requirement() {
 		local_exit_failsafe
 	fi
 
+	__heading "Parsing sources"
+	__info "Parsing file %s…" "$file"
 	parse_sources_file "$file" --new-line-format || __failure "Parsing failed!"
 	if ! validate_tree; then
-		__error "tree validation failed: %s" "$file"
-		local_exit_failsafe
+		__failure "Validating sources failed!"
+		 if ! $print_sources; then
+			__error "Tree validation failed!"
+			local_exit_failsafe
+		fi
 	fi
+
+	__success "Parsing completed."
+
+	if $print_sources; then
+		print_tree true true
+		__info "[%s] done." "__$__current_script_name"
+		exit 0
+	fi
+
+	$__debug && print_tree true true
+
+	__info "Reading input. Generating tree…"
+	generate_tree
+	__info "Generating tree… done."
 
 	local key
 	for key in "${tree_order[@]}"; do
@@ -752,27 +771,6 @@ trap 'abandon_partial $EXIT_INTERRUPTED' "INT"
 trap 'abandon_partial $EXIT_TERMINATED' "TERM"
 
 __info "[%s] building bibliography" "__$__current_script_name"
-
-__heading "Parsing sources"
-__info "Parsing file %s…" "$source_file"
-parse_sources_file "$source_file" --new-line-format || __failure "Parsing failed!"
-if ! validate_tree; then
-	__failure "Validating sources failed!"
-	 if ! $print_sources; then
-		__error "Tree validation failed!"
-		local_exit_failsafe
-	fi
-fi
-
-__success "Parsing completed."
-
- if $print_sources; then
-	print_tree true true
-	__info "[%s] done." "__$__current_script_name"
-	exit 0
-fi
-
-$__debug && print_tree true true
 
 queue+=("$source_file"$'\t'"0")
 
