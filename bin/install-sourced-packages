@@ -1,17 +1,11 @@
 #!/bin/bash
 
-source -- "./bin/library/base" || exit 1
-__set_script_path 1
-__enable_error_handler
+#source -- "./bin/library/base" || exit 1
+#__set_script_path 1
+#__enable_error_handler
 
 # configuration start
 
-readonly ARCHIVE_DOWNLOADS_DIRECTORY="archive/downloads"
-readonly ARCHIVE_INSTALLATIONS_DIRECTORY="archive/installations"
-readonly HANDLERS_DIRECTORY="post-installation-handlers"
-readonly DYNAMIC_FILE="installed-libraries.dynamic"
-readonly SOURCES_FILE="packages.sources"
-readonly PINNED_FILE="packages.pinned.sources"
 
 # configuration end
 
@@ -19,10 +13,7 @@ function local_exit_failsafe() { __exit_failsafe; exit 1; }
 
 # script task start
 
-if [[ -z "${bootstrap_install_sourced-}" ]]; then
-	source -- "bootstrap_install" || exit 1
-	bootstrap_install_sourced=true
-fi
+require_once -- "bootstrap_install"
 
 __info "[%s] installing sourced packages" "__$__current_script_name"
 
@@ -38,14 +29,19 @@ update_to_any_depth=false
 declare -A seen=()
 declare -A decided_version=()
 declare -A decided_by=()
+
 if ! declare -p installed_paths &>"/dev/null"; then
 	declare -A installed_paths=()
 fi
+
 declare -A registered_handlers=()
 declare -a registered_handler_order=()
+
 # breadth-first queue of "file<TAB>depth"
 declare -a queue=()
-declare -A handler_sourced=()
+if ! declare -p handler_sourced &>"/dev/null"; then
+	declare -A handler_sourced=()
+fi
 
 print_sources=false
 
@@ -657,11 +653,14 @@ function process_requirement() {
 		check_conflict "$project" "$identity" "$requester"
 
 		local handlers_directory
-		handlers_directory="$(dirname -- "$file")/$HANDLERS_DIRECTORY"
+		handlers_directory="$(dirname -- "$file")/$CONTROL_DIRECTORY"
 		local handler="$handlers_directory/$project"
 		if [[ -f "$handler" ]]; then
 			__info "sourcing post-installation handler %s" "$handler"
-			source_once "$handler" || __warn "handler file failed to source: %s" "$handler"
+			if ! source_once "$handler"; then
+				__warn "handler file failed to source: %s" "$handler"
+				return 1
+			fi
 			handler_sourced["$project"]=1
 		fi
 
@@ -782,13 +781,18 @@ function process_requirement() {
 	done
 }
 
-if ! (cd -- "$installation_root");  then
+if ! (cd -- "$installation_root"); then
 	__error "cannot cd into installation root: %s" "$installation_root"
 	local_exit_failsafe
 fi
 
-bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/core-library/sourcetree_datafile_format"
-source -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format" || exit 1
+if [[ ! -f "$installation_root/FLAG_IS_PROJECT" ]]; then
+	__error "project flag file does not mark installation root: %s" "$installation_root/FLAG_IS_PROJECT"
+	local_exit_failsafe
+fi
+
+bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/core-library"
+require_once -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format"
 
 input_file="$(__normalize_path_slashes "$installation_root/$SOURCES_FILE")"
 pinned_file="$(__normalize_path_slashes "$installation_root/$PINNED_FILE")"
@@ -813,10 +817,10 @@ else
 fi
 
 if [[ -f "$dynamic_file" ]]; then
-	source -- "$dynamic_file"
+	require_once -- "$dynamic_file"
 	for variable in ${!__*}; do
 		[[ "$variable" != *_library_path ]] && continue
-		project="${variable#__}"
+		project="${variable#"__"}"
 		project="${project%_library_path}"
 		installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
 	done
@@ -861,14 +865,15 @@ trap - "INT" "TERM"
 
 __heading "Checking handlers"
 
-missing=0
+missing=false
 for project in "${!installed_paths[@]}"; do
 	if [[ -z "${handler_sourced["$project"]-}" ]]; then
 		__warn "handler file missing for %s" "$project"
-		missing=1
+		missing=true
 	fi
 done
-if (( missing )); then
+
+if $missing; then
 	__error "Installation failed"
 	local_exit_failsafe
 fi
