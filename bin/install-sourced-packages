@@ -6,6 +6,13 @@ __enable_error_handler
 
 # configuration start
 
+readonly ARCHIVE_DOWNLOADS_DIRECTORY="archive/downloads"
+readonly ARCHIVE_INSTALLATIONS_DIRECTORY="archive/installations"
+readonly HANDLERS_DIRECTORY="post-installation-handlers"
+readonly DYNAMIC_FILE="installed-libraries.dynamic"
+readonly SOURCES_FILE="packages.sources"
+readonly PINNED_FILE="packages.pinned.sources"
+
 # configuration end
 
 function local_exit_failsafe() { __exit_failsafe; exit 1; }
@@ -476,10 +483,10 @@ function enqueue_nested() {
 	local library_path="$1" depth="$2"
 
 	local nested=""
-	if [[ -f "$library_path/packages.pinned.sources" ]] && ! $force_download_newer; then
-		nested="$library_path/packages.pinned.sources"
-	elif [[ -f "$library_path/packages.sources" ]]; then
-		nested="$library_path/packages.sources"
+	if [[ -f "$library_path/$PINNED_FILE" ]] && ! $force_download_newer; then
+		nested="$library_path/$PINNED_FILE"
+	elif [[ -f "$library_path/$SOURCES_FILE" ]]; then
+		nested="$library_path/$SOURCES_FILE"
 	fi
 
 	[[ -z "$nested" ]] && return 0
@@ -719,7 +726,9 @@ function process_requirement() {
 
 		archive_zip "$zip_temporary" "$stem"
 
-		local handler="$handler_directory/$project"
+		local handlers_directory
+		handlers_directory="$(dirname -- "$file")/$HANDLERS_DIRECTORY"
+		local handler="$handlers_directory/$project"
 		if [[ -f "$handler" ]]; then
 			__info "running post-installation handler %s" "$handler"
 
@@ -758,13 +767,11 @@ fi
 bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/core-library/sourcetree_datafile_format"
 source -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format" || exit 1
 
-input_file="$installation_root/packages.sources"
-pinned_file="$installation_root/packages.pinned.sources"
-
-zip_archive_directory="$(__normalize_path_slashes "$installation_root/archive/downloads/")"
-installation_archive_directory="$(__normalize_path_slashes "$installation_root/archive/installations/")"
-handler_directory="$(__normalize_path_slashes "$installation_root/post-installation-handlers/")"
-dynamic_file="$(__normalize_path_slashes "$installation_root/installed-libraries.dynamic")"
+input_file="$(__normalize_path_slashes "$installation_root/$SOURCES_FILE")"
+pinned_file="$(__normalize_path_slashes "$installation_root/$PINNED_FILE")"
+zip_archive_directory="$(__normalize_path_slashes "$installation_root/$ARCHIVE_DOWNLOADS_DIRECTORY/")"
+installation_archive_directory="$(__normalize_path_slashes "$installation_root/$ARCHIVE_INSTALLATIONS_DIRECTORY/")"
+dynamic_file="$(__normalize_path_slashes "$installation_root/$DYNAMIC_FILE")"
 
 if [[ ! -f "$input_file" ]]; then
 	__error "input file not found: %s" "$input_file"
