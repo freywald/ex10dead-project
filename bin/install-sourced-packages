@@ -286,9 +286,9 @@ function apply_force_download_newer() {
 }
 
 function same_install() {
-	local settings="$target/installation-settings.markdown"
+	local settings="$target_library_path/installation-settings.markdown"
 
-	[[ ! -d "$target" || ! -f "$settings" ]] && return 1
+	[[ ! -d "$target_library_path" || ! -f "$settings" ]] && return 1
 
 	local installed_url installed_tag installed_commit
 	installed_url="$(settings_value "$settings" "download url")"
@@ -317,7 +317,7 @@ function record_library() {
 	elif [[ -n "$requirement_branch" ]]; then
 		printf '# version="%s"\n' "$requirement_branch" >> "$dynamic_partial"
 	fi
-	printf '__%s_library_path="%s/"\n' "$requirement_project" "$target" >> "$dynamic_partial"
+	printf '__%s_library_path="%s/"\n' "$requirement_project" "$target_library_path" >> "$dynamic_partial"
 }
 
 function record_pin() {
@@ -618,15 +618,16 @@ function process_requirement() {
 		check_conflict "$project" "$identity" "$requester"
 
 		if [[ -n "${installed_paths["$project"]-}" ]]; then
-			target="${installed_paths["$project"]}"
-			__info "already installed at %s, skipping %s" "$target" "$project"
+			target_library_path="${installed_paths["$project"]}"
+			target_library_path="$(__normalize_path_slashes "$target_library_path")"
+			__info "already installed at %s, skipping %s" "$target_library_path" "$project"
 
 			record_library
 			seen["$project"]="installed"
 
 			local depth_next
 			depth_next="$((depth + 1))" || __expression_may_fail
-			enqueue_nested "$target" "$depth_next"
+			enqueue_nested "$target_library_path" "$depth_next"
 
 			continue
 		fi
@@ -637,25 +638,26 @@ function process_requirement() {
 
 		record_pin
 
-		target="$entry_installation_root/$entry_installation_path/$project"
+		target_library_path="$entry_installation_root/$entry_installation_path/$project"
+		target_library_path="$(__normalize_path_slashes "$target_library_path")"
 		installation_target=""
 		installation_zip=""
 		installation_complete=false
 
-		if [[ -L "$target" ]]; then
+		if [[ -L "$target_library_path" ]]; then
 			__info "already locally linked, skipping external install of %s" "$project"
 			record_library
 			seen["$project"]="installed"
 
 			local depth_next
 			depth_next="$((depth + 1))" || __expression_may_fail
-			enqueue_nested "$target" "$depth_next"
+			enqueue_nested "$target_library_path" "$depth_next"
 
 			continue
 		fi
 
-		if [[ -e "$target" && ! -d "$target" ]]; then
-			__error "install path exists and is not a directory: %s" "$target"
+		if [[ -e "$target_library_path" && ! -d "$target_library_path" ]]; then
+			__error "install path exists and is not a directory: %s" "$target_library_path"
 			local_exit_failsafe
 		fi
 
@@ -666,18 +668,18 @@ function process_requirement() {
 
 			local depth_next
 			depth_next="$((depth + 1))" || __expression_may_fail
-			enqueue_nested "$target" "$depth_next"
+			enqueue_nested "$target_library_path" "$depth_next"
 
 			continue
 		fi
 
-		if [[ -d "$target" ]]; then
-			backup_installation_directory "$target" "$project"
+		if [[ -d "$target_library_path" ]]; then
+			backup_installation_directory "$target_library_path" "$project"
 		fi
 
 		__info "installing %s from %s" "$project" "$requirement_download"
 
-		installation_target="$target"
+		installation_target="$target_library_path"
 		mkdir --parents -- "$(dirname -- "$installation_target")"
 
 		local zip_temporary
@@ -696,10 +698,10 @@ function process_requirement() {
 			local_exit_failsafe
 		fi
 
-		if ! extract_zip "$zip_temporary" "$target"; then
+		if ! extract_zip "$zip_temporary" "$target_library_path"; then
 			archive_zip "$zip_temporary" "${project}-failed"
 			installation_zip=""
-			[[ -e "$target" ]] && backup_installation_directory "$target" "$project"
+			[[ -e "$target_library_path" ]] && backup_installation_directory "$target_library_path" "$project"
 			installation_target=""
 			seen["$project"]="failed"
 
@@ -722,9 +724,9 @@ function process_requirement() {
 			__info "running post-installation handler %s" "$handler"
 
 			status=0
-			( cd -- "$target" && "$handler" ) || status="$(__abort_on_interrupt "$?")"
+			( cd -- "$target_library_path" && "$handler" ) || status="$(__abort_on_interrupt "$?")"
 			if (( status != 0 )); then
-				backup_installation_directory "$target" "$project"
+				backup_installation_directory "$target_library_path" "$project"
 				installation_target=""
 				seen["$project"]="failed"
 
@@ -733,18 +735,18 @@ function process_requirement() {
 			fi
 		fi
 
-		write_installation_settings "$target"
+		write_installation_settings "$target_library_path"
 
 		installation_complete=true
 		installation_target=""
 
 		record_library
 		seen["$project"]="installed"
-		installed_paths["$project"]="$target"
+		installed_paths["$project"]="$target_library_path"
 
 		local depth_next
 		depth_next="$((depth + 1))" || __expression_may_fail
-		enqueue_nested "$target" "$depth_next"
+		enqueue_nested "$target_library_path" "$depth_next"
 	done
 }
 
@@ -758,10 +760,11 @@ source -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafil
 
 input_file="$installation_root/packages.sources"
 pinned_file="$installation_root/packages.pinned.sources"
-zip_archive_directory="$installation_root/archive/downloads/"
-installation_archive_directory="$installation_root/archive/installations/"
-handler_directory="$installation_root/post-installation-handlers/"
-dynamic_file="$installation_root/installed-libraries.dynamic"
+
+zip_archive_directory="$(__normalize_path_slashes "$installation_root/archive/downloads/")"
+installation_archive_directory="$(__normalize_path_slashes "$installation_root/archive/installations/")"
+handler_directory="$(__normalize_path_slashes "$installation_root/post-installation-handlers/")"
+dynamic_file="$(__normalize_path_slashes "$installation_root/installed-libraries.dynamic")"
 
 if [[ ! -f "$input_file" ]]; then
 	__error "input file not found: %s" "$input_file"
@@ -777,6 +780,16 @@ elif [[ -f "$pinned_file" && -s "$pinned_file" ]]; then
 	__info "requirements are pinned; using %s" "$pinned_file"
 else
 	__info "no pin file; using %s" "$input_file"
+fi
+
+if [[ -f "$dynamic_file" ]]; then
+	source -- "$dynamic_file"
+	for variable in ${!__*}; do
+		[[ "$variable" != *_library_path ]] && continue
+		project="${variable#__}"
+		project="${project%_library_path}"
+		installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+	done
 fi
 
 mkdir --parents -- "$zip_archive_directory" "$installation_archive_directory" "$(dirname -- "$dynamic_file")"
