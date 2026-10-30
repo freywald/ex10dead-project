@@ -41,6 +41,8 @@ declare -A decided_by=()
 if ! declare -p installed_paths &>"/dev/null"; then
 	declare -A installed_paths=()
 fi
+declare -A registered_handlers=()
+declare -a registered_handler_order=()
 # breadth-first queue of "file<TAB>depth"
 declare -a queue=()
 
@@ -479,6 +481,35 @@ function check_conflict() {
 	local_exit_failsafe
 }
 
+function register_handler() {
+	local id="$1" function_name="$2"
+
+	if [[ -n "${registered_handlers["$id"]-}" ]]; then
+		return 0
+	fi
+
+	registered_handlers["$id"]="$function_name"
+	registered_handler_order+=("$id")
+}
+
+function run_handlers() {
+	local id function_name status failed=0
+
+	for id in "${registered_handler_order[@]}"; do
+		function_name="${registered_handlers["$id"]}"
+		__info "running handler %s (%s)" "$id" "$function_name"
+
+		status=0
+		"$function_name" || status="$(__abort_on_interrupt "$?")"
+		if (( status != 0 )); then
+			__warn "handler %s failed with status %s" "$id" "$status"
+			failed=1
+		fi
+	done
+
+	return "$failed"
+}
+
 function enqueue_nested() {
 	local library_path="$1" depth="$2"
 
@@ -730,18 +761,8 @@ function process_requirement() {
 		handlers_directory="$(dirname -- "$file")/$HANDLERS_DIRECTORY"
 		local handler="$handlers_directory/$project"
 		if [[ -f "$handler" ]]; then
-			__info "running post-installation handler %s" "$handler"
-
-			status=0
-			( cd -- "$target_library_path" && "$handler" ) || status="$(__abort_on_interrupt "$?")"
-			if (( status != 0 )); then
-				backup_installation_directory "$target_library_path" "$project"
-				installation_target=""
-				seen["$project"]="failed"
-
-				__error "post-installation handler failed: %s" "$handler"
-				local_exit_failsafe
-			fi
+			__info "sourcing post-installation handler %s" "$handler"
+			source -- "$handler" || __warn "handler file failed to source: %s" "$handler"
 		fi
 
 		write_installation_settings "$target_library_path"
@@ -835,5 +856,11 @@ else
 fi
 
 trap - "INT" "TERM"
+
+__heading "Running handlers"
+if ! run_handlers; then
+	__error "one or more handlers failed"
+	local_exit_failsafe
+fi
 
 __info "[%s] done." "__$__current_script_name"
