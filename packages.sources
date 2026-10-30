@@ -1,0 +1,9 @@
+# name=desynchronizer
+# type=url
+https://github.com/freywald/desynchronizer
+
+# type=apt
+rhash
+
+# type=apt
+xxhash

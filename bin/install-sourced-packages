@@ -45,6 +45,7 @@ declare -A registered_handlers=()
 declare -a registered_handler_order=()
 # breadth-first queue of "file<TAB>depth"
 declare -a queue=()
+declare -A handler_sourced=()
 
 print_sources=false
 
@@ -661,6 +662,7 @@ function process_requirement() {
 		if [[ -f "$handler" ]]; then
 			__info "sourcing post-installation handler %s" "$handler"
 			source_once "$handler" || __warn "handler file failed to source: %s" "$handler"
+			handler_sourced["$project"]=1
 		fi
 
 		if [[ -n "${installed_paths["$project"]-}" ]]; then
@@ -856,6 +858,20 @@ else
 fi
 
 trap - "INT" "TERM"
+
+__heading "Checking handlers"
+
+missing=0
+for project in "${!installed_paths[@]}"; do
+	if [[ -z "${handler_sourced["$project"]-}" ]]; then
+		__warn "handler file missing for %s" "$project"
+		missing=1
+	fi
+done
+if (( missing )); then
+	__error "Installation failed"
+	local_exit_failsafe
+fi
 
 __heading "Running handlers"
 if ! run_handlers; then
