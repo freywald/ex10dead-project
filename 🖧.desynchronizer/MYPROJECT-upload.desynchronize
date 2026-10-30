@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# DESYNCHRONIZER
+# 					Synchronize by desynchronizing, disorganize by reorganizing.
+#
+# runs desynchronizer with these options:
+
+desynchronizer --transport="rclone" --route-configuration-file="${BASH_SOURCE[0]}" "$@" \
+--sync-remote="hetzner-storage" --direction="upload" \
+--source="/home/$USER/Daten/myproject/" \
+--target="Daten/Text/myproject/" \
+--target-backup-directory-path="Archiv/cloud-file-archive/" \
+--source-backup-directory-path-exclude="Archiv/local-file-archive/" \
+--output-variable-route-description="Uploads project directory to the Storage Share." \
+--output-variable-directory-name="project directory" \
+--output-variable-source-device-description="local station" \
+--output-variable-target-device-description="external Hetzner Storage Share – 1999TB – https://URL"
+

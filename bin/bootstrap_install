@@ -1,9 +1,5 @@
 #!/bin/bash
 
-#source -- "./bin/library/base" || exit 1
-#__set_script_path 1
-#__enable_error_handler
-
 if ! declare -p installed_paths &>"/dev/null"; then
 	declare -A installed_paths=()
 fi

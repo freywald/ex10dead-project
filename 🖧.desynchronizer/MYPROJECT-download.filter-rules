@@ -1,0 +1,12 @@
+- *.~lock*
+- /Build/gallery/**
+- /Build/Im Dokument verlinkte Bilder/**
+- /bin/configuration
+- /Installer/bin/configuration
+- configuration/cache
+- configuration/invalid
+- .idea/**
+- .git/**
+- gallery-dl.cache.sqlite3
+- venv/**
+- ■ */**
