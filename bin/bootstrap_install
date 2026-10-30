@@ -36,33 +36,34 @@ function bootstrap_install() {
 
 	printf -v "__${project_name}_library_path" '%s/' "$destination"
 
+
 	if [[ -d "$destination" ]]; then
 		__info "Bootstrapping %s not necessary… skipped." "$project_name"
-		return 0
-	fi
-
-	temporary_directory="$(__create_temporary_directory)"
-	wget --quiet --output-document "$temporary_directory/archive.zip" -- "$download_url" || status="$(__abort_on_interrupt "$?")"
-	if (( status != 0 )); then
-		[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
-		return "$status"
-	fi
-
-	unzip -q -d "$temporary_directory/extracted" -- "$temporary_directory/archive.zip" || status="$(__abort_on_interrupt "$?")"
-	if (( status != 0 )); then
-		[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
-		return "$status"
-	fi
-
-	mkdir --parents -- "$destination"
-	local entries=("$temporary_directory/extracted/"*)
-	if (( ${#entries[@]} == 1 )) && [[ -d "${entries[0]}" ]]; then
-		mv -- "${entries[0]}/"* "$destination/"
 	else
-		mv -- "$temporary_directory/extracted/"* "$destination/"
-	fi
+		temporary_directory="$(__create_temporary_directory)"
+		wget --quiet --output-document "$temporary_directory/archive.zip" -- "$download_url" || status="$(__abort_on_interrupt "$?")"
+		if (( status != 0 )); then
+			[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
+			__error "download failed: %s" "$download_url"
+			local_exit_failsafe
+		fi
 
-	cat > "$destination/installation-settings.markdown" <<EOF
+		unzip -q -d "$temporary_directory/extracted" -- "$temporary_directory/archive.zip" || status="$(__abort_on_interrupt "$?")"
+		if (( status != 0 )); then
+			[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
+			__error "extract failed: %s" "$download_url"
+			local_exit_failsafe
+		fi
+
+		mkdir --parents -- "$destination"
+		local entries=("$temporary_directory/extracted/"*)
+		if (( ${#entries[@]} == 1 )) && [[ -d "${entries[0]}" ]]; then
+			mv -- "${entries[0]}/"* "$destination/"
+		else
+			mv -- "$temporary_directory/extracted/"* "$destination/"
+		fi
+
+		cat > "$destination/installation-settings.markdown" <<EOF
 # installation settings
 
 - source url: ${url}
@@ -71,20 +72,20 @@ function bootstrap_install() {
 - installed at: $(date +%d-%m-%Y-%H-%M-%S)
 EOF
 
+		[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
+	fi
+
 	installed_paths["$project_name"]="$destination"
 
-	local root
+	local root handler
 	root="$(dirname -- "$(dirname -- "$destination")")"
 	handler="$(__normalize_path_slashes "$root/$CONTROL_DIRECTORY/$project_name")"
 	if [[ -f "$handler" ]]; then
 		__info "sourcing post-installation handler %s" "$handler"
 		if ! source_once "$handler"; then
-			__warn "handler file failed to source: %s" "$handler"
-			return 1
+			__error "handler file failed to source: %s" "$handler"
+			local_exit_failsafe
 		fi
-
 		handler_sourced["$project_name"]=1
 	fi
-
-	[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
 }

@@ -657,10 +657,7 @@ function process_requirement() {
 		local handler="$handlers_directory/$project"
 		if [[ -f "$handler" ]]; then
 			__info "sourcing post-installation handler %s" "$handler"
-			if ! source_once "$handler"; then
-				__warn "handler file failed to source: %s" "$handler"
-				return 1
-			fi
+			require_once "$handler"
 			handler_sourced["$project"]=1
 		fi
 
@@ -879,6 +876,13 @@ if $missing; then
 fi
 
 __heading "Running handlers"
+for project in "${!seen[@]}"; do
+	if [[ "${seen["$project"]}" == "failed" ]]; then
+		__error "installation failed for %s, skipping handlers" "$project"
+		local_exit_failsafe
+	fi
+done
+
 if ! run_handlers; then
 	__error "one or more handlers failed"
 	local_exit_failsafe
