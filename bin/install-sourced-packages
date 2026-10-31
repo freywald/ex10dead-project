@@ -662,7 +662,7 @@ function process_requirement() {
 			local_exit_failsafe
 		fi
 
-		if ! $force_installation_all && ! $force_download_newer && same_install; then
+		if ! $force_installation_all && same_install; then
 			__info "already installed, skipping %s" "$project"
 			record_library
 			seen["$project"]="installed"
