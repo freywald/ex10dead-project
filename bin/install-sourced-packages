@@ -779,7 +779,7 @@ function install_package() {
 		local_exit_failsafe
 	fi
 
-	__require_once "bootstrap_install"
+	__require_once "./bootstrap_install"
 
 	__info "[%s] installing sourced packages" "__$__current_script_name"
 
