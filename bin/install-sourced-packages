@@ -620,6 +620,11 @@ function process_requirement() {
 
 				continue
 			fi
+			if [[ -f "$handler" ]]; then
+				__info "sourcing post-installation handler %s" "$handler"
+				__require_once "$handler"
+				handler_sourced["$project"]=1
+			fi
 		fi
 
 		if [[ -n "${seen["$project"]-}" ]]; then
