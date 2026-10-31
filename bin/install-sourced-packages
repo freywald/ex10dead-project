@@ -761,6 +761,8 @@ function install_package() {
 			force_download_newer=true
 			update_to_any_depth=true
 			shift ||__expression_may_fail
+		elif [[ "$1" == "--" ]]; then
+			shift ||__expression_may_fail
 		else
 			__error "unknown program argument %s" "$1"
 			local_exit_failsafe
