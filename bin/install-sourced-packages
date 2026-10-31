@@ -18,6 +18,8 @@ force_installation_all=false
 force_download_newer=false
 update_to_any_depth=false
 
+readonly EXIT_REBOOT=12
+
 # seen: project -> installed|checked|failed
 # decided_version: project -> identity string
 # decided_by: project -> who requested it
@@ -632,7 +634,7 @@ function process_requirement() {
 		fi
 
 		record_pin
-		
+
 		if [[ -n "${installed_paths["$project"]-}" ]]; then
 			target_library_path="${installed_paths["$project"]}"
 		else
@@ -857,6 +859,53 @@ function install_package() {
 			fi
 		done
 	fi
+
+	local rebooted=false
+	if $force_download_newer; then
+		local project path
+		for project in "${!installed_paths[@]}"; do
+			path="${installed_paths["$project"]}"
+			[[ ! -d "$path" ]] && continue
+
+			local settings="$path/installation-settings.markdown"
+			local installed_commit=""
+			[[ -f "$settings" ]] && installed_commit="$(settings_value "$settings" "commit")"
+
+			local page commit
+			page="$(settings_value "$settings" "source url")"
+			[[ -z "$page" ]] && continue
+
+			commit="$(git ls-remote "$page.git" "refs/heads/master" 2>"/dev/null" | awk '{print $1; exit}')"
+			[[ -z "$commit" || "$commit" == "$installed_commit" ]] && continue
+
+			__info "commit changed for %s, re-downloading" "$project"
+			backup_installation_directory "$path" "$project"
+
+			local download_url="${page}/archive/refs/heads/master.zip"
+			local zip_temporary
+			zip_temporary="$(__create_temporary_file).zip"
+			curl -fL --retry 3 --retry-delay 2 -o "$zip_temporary" -- "$download_url" || continue
+			extract_zip "$zip_temporary" "$path" || continue
+			rm -f -- "$zip_temporary"
+
+			cat >| "$path/installation-settings.markdown" <<EOF
+# installation settings
+
+- source url: ${page}
+- download url: ${download_url}
+- commit: ${commit}
+- install directory: ${path}
+- installed at: $(date +%d-%m-%Y-%H-%M-%S)
+EOF
+		rebooted=true
+		done
+	fi
+
+	if $rebooted; then
+		__info "bootstrapped libraries updated, reboot required"
+		exit "$EXIT_REBOOT"
+	fi
+
 
 	mkdir --parents -- "$zip_archive_directory" "$installation_archive_directory" "$(dirname -- "$dynamic_file")"
 
