@@ -632,7 +632,7 @@ function process_requirement() {
 		fi
 
 		record_pin
-
+		
 		if [[ -n "${installed_paths["$project"]-}" ]]; then
 			target_library_path="${installed_paths["$project"]}"
 		else
@@ -736,7 +736,10 @@ function process_requirement() {
 
 		record_library
 		seen["$project"]="installed"
-		installed_paths["$project"]="$target_library_path"
+
+		if [[ -z "${installed_paths["$project"]-}" ]]; then
+			installed_paths["$project"]="$target_library_path"
+		fi
 
 		local depth_next
 		depth_next="$((depth + 1))" || __expression_may_fail
