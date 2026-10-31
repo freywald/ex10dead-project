@@ -1,9 +1,7 @@
+# name=ex10dead_common_library
+# type=url
+https://github.com/freywald/ex10dead-common-library
+
 # name=desynchronizer
 # type=url
 https://github.com/freywald/desynchronizer
-
-# type=apt
-rhash
-
-# type=apt
-xxhash

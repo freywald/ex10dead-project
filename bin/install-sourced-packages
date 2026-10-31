@@ -13,10 +13,6 @@ function local_exit_failsafe() { __exit_failsafe; exit 1; }
 
 # script task start
 
-__require_once -- "bootstrap_install"
-
-__info "[%s] installing sourced packages" "__$__current_script_name"
-
 installation_root=""
 branch_primary="master"
 force_installation_all=false
@@ -41,58 +37,6 @@ fi
 
 if ! declare -p handler_sourced &>"/dev/null"; then
 	declare -A handler_sourced=()
-fi
-
-print_sources=false
-
-while (($# > 0)); do
-	if [[ "$1" == "--debug" ]]; then
-		__debug=true
-		shift ||__expression_may_fail
-	elif [[ "$1" == "--verbose" ]]; then
-		__verbose=true
-		shift ||__expression_may_fail
-	elif [[ "$1" == "--quiet" ]]; then
-		__quiet=true
-		shift ||__expression_may_fail
-	elif [[ "$1" == "--print" || "$1" == "--print-sources" ]]; then
-		print_sources=true
-		shift || __expression_may_fail
-	elif [[ "$1" == "--installation-root" ]]; then
-		if [[ -z "${2-}" ]]; then
-			__error "--installation-root requires a path"
-			local_exit_failsafe
-		fi
-		installation_root="$2"
-		shift 2 ||__expression_may_fail
-	elif [[ "$1" == "--installation-root="* ]]; then
-		if [[ -z "${1#--installation-root=}" ]]; then
-			__error "--installation-root requires a path"
-			local_exit_failsafe
-		fi
-		installation_root="${1#--installation-root=}"
-		shift ||__expression_may_fail
-	elif [[ "$1" == "--force-install-all" ]]; then
-		force_installation_all=true
-		shift ||__expression_may_fail
-	elif [[ "$1" == "--force-download-newer" || "$1" == "--update" ]]; then
-		force_download_newer=true
-		shift ||__expression_may_fail
-	elif [[ "$1" == "--update-to-any-depth" ]]; then
-		force_download_newer=true
-		update_to_any_depth=true
-		shift ||__expression_may_fail
-	else
-		__error "unknown program argument %s" "$1"
-		local_exit_failsafe
-	fi
-done
-
-installation_root="${installation_root%"/"}"
-
-if [[ -z "$installation_root" ]]; then
-	__error "installation_root is empty or not set"
-	local_exit_failsafe
 fi
 
 function date_stamp_from_path() {
@@ -777,115 +721,173 @@ function process_requirement() {
 	done
 }
 
-if ! (cd -- "$installation_root"); then
-	__error "cannot cd into installation root: %s" "$installation_root"
-	local_exit_failsafe
-fi
+function install_package() {
+	print_sources=false
 
-if [[ ! -f "$installation_root/FLAG_IS_PROJECT" ]]; then
-	__error "project flag file does not mark installation root: %s" "$installation_root/FLAG_IS_PROJECT"
-	local_exit_failsafe
-fi
-
-bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/core-library"
-__require_once -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format"
-
-input_file="$(__normalize_path_slashes "$installation_root/$SOURCES_FILE")"
-pinned_file="$(__normalize_path_slashes "$installation_root/$PINNED_FILE")"
-zip_archive_directory="$(__normalize_path_slashes "$installation_root/$ARCHIVE_DOWNLOADS_DIRECTORY/")"
-installation_archive_directory="$(__normalize_path_slashes "$installation_root/$ARCHIVE_INSTALLATIONS_DIRECTORY/")"
-dynamic_file="$(__normalize_path_slashes "$installation_root/$DYNAMIC_FILE")"
-
-if [[ ! -f "$input_file" ]]; then
-	__error "input file not found: %s" "$input_file"
-	local_exit_failsafe
-fi
-
-source_file="$input_file"
-
-if $force_download_newer; then
-	__info "updating from %s" "$input_file"
-elif [[ -f "$pinned_file" && -s "$pinned_file" ]]; then
-	source_file="$pinned_file"
-	__info "requirements are pinned; using %s" "$pinned_file"
-else
-	__info "no pin file; using %s" "$input_file"
-fi
-
-if [[ -f "$dynamic_file" ]]; then
-	__require_once -- "$dynamic_file"
-	for variable in ${!__*}; do
-		[[ "$variable" != *_library_path ]] && continue
-		project="${variable#"__"}"
-		project="${project%_library_path}"
-		installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+	while (($# > 0)); do
+		if [[ "$1" == "--debug" ]]; then
+			__debug=true
+			shift ||__expression_may_fail
+		elif [[ "$1" == "--verbose" ]]; then
+			__verbose=true
+			shift ||__expression_may_fail
+		elif [[ "$1" == "--quiet" ]]; then
+			__quiet=true
+			shift ||__expression_may_fail
+		elif [[ "$1" == "--print" || "$1" == "--print-sources" ]]; then
+			print_sources=true
+			shift || __expression_may_fail
+		elif [[ "$1" == "--installation-root" ]]; then
+			if [[ -z "${2-}" ]]; then
+				__error "--installation-root requires a path"
+				local_exit_failsafe
+			fi
+			installation_root="$2"
+			shift 2 ||__expression_may_fail
+		elif [[ "$1" == "--installation-root="* ]]; then
+			if [[ -z "${1#--installation-root=}" ]]; then
+				__error "--installation-root requires a path"
+				local_exit_failsafe
+			fi
+			installation_root="${1#--installation-root=}"
+			shift ||__expression_may_fail
+		elif [[ "$1" == "--force-install-all" ]]; then
+			force_installation_all=true
+			shift ||__expression_may_fail
+		elif [[ "$1" == "--force-download-newer" || "$1" == "--update" ]]; then
+			force_download_newer=true
+			shift ||__expression_may_fail
+		elif [[ "$1" == "--update-to-any-depth" ]]; then
+			force_download_newer=true
+			update_to_any_depth=true
+			shift ||__expression_may_fail
+		else
+			__error "unknown program argument %s" "$1"
+			local_exit_failsafe
+		fi
 	done
-fi
 
-mkdir --parents -- "$zip_archive_directory" "$installation_archive_directory" "$(dirname -- "$dynamic_file")"
+	installation_root="${installation_root%"/"}"
 
-dynamic_partial="$(__create_temporary_file)"
-pinned_partial="$(__create_temporary_file)"
-installation_target=""
-installation_zip=""
-installation_complete=false
-
-trap 'abandon_partial $EXIT_INTERRUPTED' "INT"
-trap 'abandon_partial $EXIT_TERMINATED' "TERM"
-
-__info "[%s] building bibliography" "__$__current_script_name"
-
-# breadth-first queue of "file<TAB>depth"
-queue+=("$source_file"$'\t'"0")
-
-while ((${#queue[@]} > 0)); do
-	entry="${queue[0]}"
-	queue=("${queue[@]:1}")
-
-	file="${entry%%$'\t'*}"
-	rest="${entry#*$'\t'}"
-	depth="${rest%%$'\t'*}"
-	requester="${rest#*$'\t'}"
-	[[ "$requester" == "$depth" ]] && requester="top-level"
-
-	process_requirement "$file" "$depth" "$requester"
-done
-
-mv -f -- "$dynamic_partial" "$dynamic_file"
-if [[ -s "$pinned_partial" ]]; then
-	mv -f -- "$pinned_partial" "$pinned_file"
-else
-	rm -f -- "$pinned_partial"
-fi
-
-trap - "INT" "TERM"
-
-__heading "Checking handlers"
-
-missing=false
-for project in "${!installed_paths[@]}"; do
-	if [[ -z "${handler_sourced["$project"]-}" ]]; then
-		__warn "handler file missing for %s" "$project"
-		missing=true
-	fi
-done
-
-if $missing; then
-	__error "Installation failed"
-	local_exit_failsafe
-fi
-
-__heading "Running handlers"
-for project in "${!seen[@]}"; do
-	if [[ "${seen["$project"]}" == "failed" ]]; then
-		__error "installation failed for %s, skipping handlers" "$project"
+	if [[ -z "$installation_root" ]]; then
+		__error "installation_root is empty or not set"
 		local_exit_failsafe
 	fi
-done
 
-if ! run_handlers; then
-	__error "one or more handlers failed"
-	local_exit_failsafe
-fi
+	__require_once -- "bootstrap_install"
 
-__info "[%s] done." "__$__current_script_name"
+	__info "[%s] installing sourced packages" "__$__current_script_name"
+
+	if ! (cd -- "$installation_root"); then
+		__error "cannot cd into installation root: %s" "$installation_root"
+		local_exit_failsafe
+	fi
+
+	if [[ ! -f "$installation_root/FLAG_IS_PROJECT" ]]; then
+		__error "project flag file does not mark installation root: %s" "$installation_root/FLAG_IS_PROJECT"
+		local_exit_failsafe
+	fi
+
+	bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/core-library"
+	__require_once -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format"
+
+	input_file="$(__normalize_path_slashes "$installation_root/$SOURCES_FILE")"
+	pinned_file="$(__normalize_path_slashes "$installation_root/$PINNED_FILE")"
+	zip_archive_directory="$(__normalize_path_slashes "$installation_root/$ARCHIVE_DOWNLOADS_DIRECTORY/")"
+	installation_archive_directory="$(__normalize_path_slashes "$installation_root/$ARCHIVE_INSTALLATIONS_DIRECTORY/")"
+	dynamic_file="$(__normalize_path_slashes "$installation_root/$DYNAMIC_FILE")"
+
+	if [[ ! -f "$input_file" ]]; then
+		__error "input file not found: %s" "$input_file"
+		local_exit_failsafe
+	fi
+
+	source_file="$input_file"
+
+	if $force_download_newer; then
+		__info "updating from %s" "$input_file"
+	elif [[ -f "$pinned_file" && -s "$pinned_file" ]]; then
+		source_file="$pinned_file"
+		__info "requirements are pinned; using %s" "$pinned_file"
+	else
+		__info "no pin file; using %s" "$input_file"
+	fi
+
+	if [[ -f "$dynamic_file" ]]; then
+		__require_once -- "$dynamic_file"
+		for variable in ${!__*}; do
+			[[ "$variable" != *_library_path ]] && continue
+			project="${variable#"__"}"
+			project="${project%_library_path}"
+			installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+		done
+	fi
+
+	mkdir --parents -- "$zip_archive_directory" "$installation_archive_directory" "$(dirname -- "$dynamic_file")"
+
+	dynamic_partial="$(__create_temporary_file)"
+	pinned_partial="$(__create_temporary_file)"
+	installation_target=""
+	installation_zip=""
+	installation_complete=false
+
+	trap 'abandon_partial $EXIT_INTERRUPTED' "INT"
+	trap 'abandon_partial $EXIT_TERMINATED' "TERM"
+
+	__info "[%s] building bibliography" "__$__current_script_name"
+
+	# breadth-first queue of "file<TAB>depth"
+	queue+=("$source_file"$'\t'"0")
+
+	while ((${#queue[@]} > 0)); do
+		entry="${queue[0]}"
+		queue=("${queue[@]:1}")
+
+		file="${entry%%$'\t'*}"
+		rest="${entry#*$'\t'}"
+		depth="${rest%%$'\t'*}"
+		requester="${rest#*$'\t'}"
+		[[ "$requester" == "$depth" ]] && requester="top-level"
+
+		process_requirement "$file" "$depth" "$requester"
+	done
+
+	mv -f -- "$dynamic_partial" "$dynamic_file"
+	if [[ -s "$pinned_partial" ]]; then
+		mv -f -- "$pinned_partial" "$pinned_file"
+	else
+		rm -f -- "$pinned_partial"
+	fi
+
+	trap - "INT" "TERM"
+
+	__heading "Checking handlers"
+
+	missing=false
+	for project in "${!installed_paths[@]}"; do
+		if [[ -z "${handler_sourced["$project"]-}" ]]; then
+			__warn "handler file missing for %s" "$project"
+			missing=true
+		fi
+	done
+
+	if $missing; then
+		__error "Installation failed"
+		local_exit_failsafe
+	fi
+
+	__heading "Running handlers"
+	for project in "${!seen[@]}"; do
+		if [[ "${seen["$project"]}" == "failed" ]]; then
+			__error "installation failed for %s, skipping handlers" "$project"
+			local_exit_failsafe
+		fi
+	done
+
+	if ! run_handlers; then
+		__error "one or more handlers failed"
+		local_exit_failsafe
+	fi
+
+	__info "[%s] done." "__$__current_script_name"
+}
