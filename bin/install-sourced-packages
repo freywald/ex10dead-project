@@ -842,10 +842,12 @@ function install_package() {
 	if [[ -f "$dynamic_file" ]]; then
 		__require_once "$dynamic_file"
 		for variable in ${!__*}; do
-			[[ "$variable" != *_library_path ]] && continue
+			[[ "$variable" != *"_library_path" ]] && continue
 			project="${variable#"__"}"
-			project="${project%_library_path}"
-			installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+			project="${project%"_library_path"}"
+			if [[ -z "${installed_paths["$project"]-}" ]]; then
+				installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+			fi
 		done
 	fi
 
