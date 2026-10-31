@@ -87,16 +87,13 @@ EOF
 	handler="$(__normalize_path_slashes "$destination/$CONTROL_DIRECTORY/$project_name")"
 	if [[ -f "$handler" ]]; then
 		__info "sourcing post-installation handler %s" "$handler"
-		if [[ "$(type -t "source_once")" != "function" ]]; then
-			if ! source "$handler"; then
+		if [[ "$(type -t "__require_once")" != "function" ]]; then
+			if ! source -- "$handler"; then
 				echo "(fallback) handler file failed to source: %s" "$handler"
 				local_exit_failsafe
 			fi
-		elif [[ "$(type -t "source_once")" == "function" ]]; then
-			if ! source_once "$handler"; then
-				__error "handler file failed to source: %s" "$handler"
-				local_exit_failsafe
-			fi
+		else
+			__require_once "$handler"
         fi
 		handler_sourced["$project_name"]=1
 	fi
