@@ -596,7 +596,7 @@ function process_requirement() {
 
 		local handlers_directory
 		handlers_directory="$(dirname -- "$file")"
-		local handler="$handlers_directory/$project/$CONTROL_DIRECTORY/$project"
+		local handler="$handlers_directory/$CONTROL_DIRECTORY/$project"
 		__warn "Searching post-installation handler at: %s" "$handler"
 		if [[ -f "$handler" ]]; then
 			__info "sourcing post-installation handler %s" "$handler"
