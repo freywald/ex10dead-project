@@ -594,10 +594,14 @@ function process_requirement() {
 		identity="$(requirement_identity)"
 		check_conflict "$project" "$identity" "$requester"
 
-		local handlers_directory
-		handlers_directory="$(dirname -- "$file")"
-		local handler="$handlers_directory/$CONTROL_DIRECTORY/$project"
-		__warn "Searching post-installation handler at: %s" "$handler"
+		local handlers_directory handler
+		handlers_directory="$(dirname -- "$file")/$CONTROL_DIRECTORY"
+		handler="$handlers_directory/$project"
+
+		if [[ ! -f "$handler" && -n "${installed_paths["$project"]-}" ]]; then
+			handler="${installed_paths["$project"]}/$CONTROL_DIRECTORY/$project"
+		fi
+
 		if [[ -f "$handler" ]]; then
 			__info "sourcing post-installation handler %s" "$handler"
 			__require_once "$handler"
