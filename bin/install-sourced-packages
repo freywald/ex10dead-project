@@ -739,14 +739,14 @@ function install_package() {
 			shift || __expression_may_fail
 		elif [[ "$1" == "--installation-root" ]]; then
 			if [[ -z "${2-}" ]]; then
-				__error "--installation-root requires a path"
+				__error "--installation-root requires a path1  $@"
 				local_exit_failsafe
 			fi
 			installation_root="$2"
 			shift 2 ||__expression_may_fail
 		elif [[ "$1" == "--installation-root="* ]]; then
 			if [[ -z "${1#--installation-root=}" ]]; then
-				__error "--installation-root requires a path"
+				__error "--installation-root requires a path2 $@"
 				local_exit_failsafe
 			fi
 			installation_root="${1#--installation-root=}"
