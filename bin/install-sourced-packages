@@ -13,7 +13,7 @@ function local_exit_failsafe() { __exit_failsafe; exit 1; }
 
 # script task start
 
-require_once -- "bootstrap_install"
+__require_once -- "bootstrap_install"
 
 __info "[%s] installing sourced packages" "__$__current_script_name"
 
@@ -656,7 +656,7 @@ function process_requirement() {
 		local handler="$handlers_directory/$project"
 		if [[ -f "$handler" ]]; then
 			__info "sourcing post-installation handler %s" "$handler"
-			require_once "$handler"
+			__require_once "$handler"
 			handler_sourced["$project"]=1
 		fi
 
@@ -788,7 +788,7 @@ if [[ ! -f "$installation_root/FLAG_IS_PROJECT" ]]; then
 fi
 
 bootstrap_install "https://github.com/freywald/sourcetree-datafile-format" "$installation_root/core-library"
-require_once -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format"
+__require_once -- "$__sourcetree_datafile_format_library_path/library/sourcetree-datafile-format"
 
 input_file="$(__normalize_path_slashes "$installation_root/$SOURCES_FILE")"
 pinned_file="$(__normalize_path_slashes "$installation_root/$PINNED_FILE")"
@@ -813,7 +813,7 @@ else
 fi
 
 if [[ -f "$dynamic_file" ]]; then
-	require_once -- "$dynamic_file"
+	__require_once -- "$dynamic_file"
 	for variable in ${!__*}; do
 		[[ "$variable" != *_library_path ]] && continue
 		project="${variable#"__"}"
