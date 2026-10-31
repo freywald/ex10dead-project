@@ -44,7 +44,6 @@ function bootstrap_install() {
 
 	printf -v "__${project_name}_library_path" '%s/' "$destination"
 
-
 	if [[ -d "$destination" ]]; then
 		__info "Bootstrapping %s not necessary… skipped." "$project_name"
 	else

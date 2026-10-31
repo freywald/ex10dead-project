@@ -633,7 +633,11 @@ function process_requirement() {
 
 		record_pin
 
-		target_library_path="$entry_installation_root/$entry_installation_path/$project"
+		if [[ -n "${installed_paths["$project"]-}" ]]; then
+			target_library_path="${installed_paths["$project"]}"
+		else
+			target_library_path="$entry_installation_root/$entry_installation_path/$project"
+		fi
 		target_library_path="$(__normalize_path_slashes "$target_library_path")"
 		installation_target=""
 		installation_zip=""
