@@ -435,6 +435,7 @@ function run_handlers() {
 	local id function_name status failed=0
 
 	for id in "${!registered_handlers[@]}"; do
+		cd -- "$__script_path/"
 		function_name="${registered_handlers["$id"]}"
 		__info "running handler %s (%s)" "$id" "$function_name"
 
