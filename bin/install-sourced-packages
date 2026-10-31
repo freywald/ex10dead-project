@@ -437,7 +437,7 @@ function run_handlers() {
 	for id in "${!registered_handlers[@]}"; do
 		cd -- "$__script_path/"
 		function_name="${registered_handlers["$id"]}"
-		__info "running handler %s (%s)" "$id" "$function_name"
+		__info "running handler %s (%s) at: %s" "$id" "$function_name" "$PWD"
 
 		status=0
 		"$function_name" || status="$(__abort_on_interrupt "$?")"
