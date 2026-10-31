@@ -29,16 +29,16 @@ update_to_any_depth=false
 declare -A seen=()
 declare -A decided_version=()
 declare -A decided_by=()
+declare -a queue=()
 
 if ! declare -p installed_paths &>"/dev/null"; then
 	declare -A installed_paths=()
 fi
 
-declare -A registered_handlers=()
-declare -a registered_handler_order=()
+if ! declare -p registered_handlers &>"/dev/null"; then
+	declare -A registered_handlers=()
+fi
 
-# breadth-first queue of "file<TAB>depth"
-declare -a queue=()
 if ! declare -p handler_sourced &>"/dev/null"; then
 	declare -A handler_sourced=()
 fi
@@ -486,13 +486,12 @@ function register_handler() {
 	fi
 
 	registered_handlers["$id"]="$function_name"
-	registered_handler_order+=("$id")
 }
 
 function run_handlers() {
 	local id function_name status failed=0
 
-	for id in "${registered_handler_order[@]}"; do
+	for id in "${!registered_handlers[@]}"; do
 		function_name="${registered_handlers["$id"]}"
 		__info "running handler %s (%s)" "$id" "$function_name"
 
@@ -836,6 +835,7 @@ trap 'abandon_partial $EXIT_TERMINATED' "TERM"
 
 __info "[%s] building bibliography" "__$__current_script_name"
 
+# breadth-first queue of "file<TAB>depth"
 queue+=("$source_file"$'\t'"0")
 
 while ((${#queue[@]} > 0)); do

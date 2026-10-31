@@ -7,12 +7,18 @@ readonly DYNAMIC_FILE="package-summary.dynamic"
 readonly SOURCES_FILE="packages.sources"
 readonly PINNED_FILE="packages.pinned.sources"
 
+function local_exit_failsafe() { exit 1; }
+
 if ! declare -p installed_paths &>"/dev/null"; then
 	declare -A installed_paths=()
 fi
 
 if ! declare -p handler_sourced &>"/dev/null"; then
 	declare -A handler_sourced=()
+fi
+
+if ! declare -p registered_handlers &>"/dev/null"; then
+	declare -A registered_handlers=()
 fi
 
 function bootstrap_install() {
@@ -78,14 +84,73 @@ EOF
 	installed_paths["$project_name"]="$destination"
 
 	local root handler
-	root="$(dirname -- "$(dirname -- "$destination")")"
-	handler="$(__normalize_path_slashes "$root/$CONTROL_DIRECTORY/$project_name")"
+	handler="$(__normalize_path_slashes "$destination/$CONTROL_DIRECTORY/$project_name")"
 	if [[ -f "$handler" ]]; then
 		__info "sourcing post-installation handler %s" "$handler"
-		if ! source_once "$handler"; then
-			__error "handler file failed to source: %s" "$handler"
-			local_exit_failsafe
-		fi
+		if [[ "$(type -t "source_once")" != "function" ]]; then
+			if ! source "$handler"; then
+				echo "(fallback) handler file failed to source: %s" "$handler"
+				local_exit_failsafe
+			fi
+		elif [[ "$(type -t "source_once")" == "function" ]]; then
+			if ! source_once "$handler"; then
+				__error "handler file failed to source: %s" "$handler"
+				local_exit_failsafe
+			fi
+        fi
 		handler_sourced["$project_name"]=1
 	fi
+}
+
+function __normalize_path_slashes()
+{
+	local s="${1:?${FUNCNAME[0]}: expected argument path}"
+	while [[ "$s" == *//* ]]; do
+		s="${s//\/\//\/}"
+	done
+	echo "$s"
+}
+
+function __create_temporary_directory() {
+	local prefix
+	prefix="$(basename -- "$0")"
+
+	mktemp --directory -- "${TMPDIR:-"/tmp/"}/${prefix}.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+}
+
+
+function __error() { printf "$@";exit 1; }
+
+function __info() { printf "$@"; }
+
+EXIT_OK=0
+EXIT_INTERRUPTED=130   # 128 + SIGINT
+EXIT_TERMINATED=143   # 128 + SIGTERM
+function __abort_on_interrupt() {
+	local status="${1:-$?}"
+	set +x
+
+	if (( status == EXIT_INTERRUPTED || status == EXIT_TERMINATED )); then
+		exit "$status"
+	fi
+
+	if (( status > 0 )); then
+		printf '%s\n' "$status"
+
+		return 0
+	fi
+
+	printf '%s\n' "$EXIT_OK"
+
+	return 0
+}
+
+function register_handler() {
+	local id="$1" function_name="$2"
+
+	if [[ -n "${registered_handlers["$id"]-}" ]]; then
+		return 0
+	fi
+
+	registered_handlers["$id"]="$function_name"
 }
