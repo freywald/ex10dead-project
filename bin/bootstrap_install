@@ -85,7 +85,7 @@ EOF
 
 	installed_paths["$project_name"]="$destination"
 
-	local root handler
+	local handler
 	handler="$(__normalize_path_slashes "$destination/$CONTROL_DIRECTORY/$project_name")"
 	if [[ -f "$handler" ]]; then
 		__info "sourcing post-installation handler %s" "$handler"
