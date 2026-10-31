@@ -13,7 +13,10 @@ function local_exit_failsafe() { __exit_failsafe; exit 1; }
 
 # script task start
 
-installation_root=""
+if ! declare -p installation_root &>"/dev/null"; then
+	installation_root=""
+fi
+
 branch_primary="master"
 force_installation_all=false
 force_download_newer=false
