@@ -84,6 +84,10 @@ EOF
 
 	installed_paths["$project_name"]="$destination"
 
+	local runtime_file="${installation_root:-"Build/libraries"}/bootstrapped.dynamic"
+	mkdir --parents -- "$(dirname -- "$runtime_file")"
+	printf '__%s_library_path="%s/"\n' "$project_name" "$destination" >> "$runtime_file"
+
 	local handler
 	handler="$(__normalize_path_slashes "$destination/$CONTROL_DIRECTORY/$project_name")"
 	if [[ -f "$handler" ]]; then

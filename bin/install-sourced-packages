@@ -767,14 +767,14 @@ function install_package() {
 			shift || __expression_may_fail
 		elif [[ "$1" == "--installation-root" ]]; then
 			if [[ -z "${2-}" ]]; then
-				__error "--installation-root requires a path1  $@"
+				__error "--installation-root requires a path"
 				local_exit_failsafe
 			fi
 			installation_root="$2"
 			shift 2 ||__expression_may_fail
 		elif [[ "$1" == "--installation-root="* ]]; then
 			if [[ -z "${1#--installation-root=}" ]]; then
-				__error "--installation-root requires a path2 $@"
+				__error "--installation-root requires a path"
 				local_exit_failsafe
 			fi
 			installation_root="${1#--installation-root=}"
@@ -846,6 +846,17 @@ function install_package() {
 		__info "requirements are pinned; using %s" "$pinned_file"
 	else
 		__info "no pin file; using %s" "$input_file"
+	fi
+
+	local runtime_file="$installation_root/bootstrapped.dynamic"
+	if [[ -f "$runtime_file" ]]; then
+		__require_once "$runtime_file"
+		local variable project
+		for variable in ${!__*_library_path}; do
+			project="${variable#"__"}"
+			project="${project%"_library_path"}"
+			installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+		done
 	fi
 
 	if [[ -f "$dynamic_file" ]]; then
@@ -975,3 +986,4 @@ EOF
 
 	__info "[%s] done." "__$__current_script_name"
 }
+
