@@ -781,7 +781,10 @@ function install_package() {
 
 	local relative_path
 	relative_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-	__require_once "$relative_path/bootstrap_install"
+
+	if [[ -z "${BOOTSTRAPPER_LOADED:-}" ]]; then
+		__require_once "$relative_path/bootstrap_install"
+	fi
 
 	__info "[%s] installing sourced packages" "__$__current_script_name"
 
