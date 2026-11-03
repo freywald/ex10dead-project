@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# preamble
+set -o errtrace -o pipefail -o noclobber -o nounset
+shopt -s inherit_errexit nullglob dotglob
+
+export LC_NUMERIC="en_US.UTF-8"
+
+shopt -s expand_aliases
+
 readonly ARCHIVE_DOWNLOADS_DIRECTORY="archive/downloads"
 readonly ARCHIVE_INSTALLATIONS_DIRECTORY="archive/installations"
 readonly CONTROL_DIRECTORY="packages.control"
