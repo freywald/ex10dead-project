@@ -896,7 +896,7 @@ function install_package() {
 	if [[ -f "$runtime_file" ]]; then
 		__require_once "$runtime_file"
 		local variable project
-		for variable in ${!"__"*"_library_path"}; do
+		for variable in ${!__*_library_path}; do
 			project="${variable#"__"}"
 			project="${project%"_library_path"}"
 			installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
@@ -905,7 +905,7 @@ function install_package() {
 
 	if [[ -f "$dynamic_file" ]]; then
 		__require_once "$dynamic_file"
-		for variable in ${!"__"*}; do
+		for variable in ${!__*}; do
 			[[ "$variable" != *"_library_path" ]] && continue
 			project="${variable#"__"}"
 			project="${project%"_library_path"}"
