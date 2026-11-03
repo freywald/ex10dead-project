@@ -98,6 +98,7 @@ function bootstrap_install() {
 		__info "Bootstrapping %s not necessary… skipped." "$project_name"
 	else
 		temporary_directory="$(__create_temporary_directory)"
+		local status=0
 		wget --quiet --output-document "$temporary_directory/archive.zip" -- "$download_url" || status="$(__abort_on_interrupt "$?")"
 		if (( status != 0 )); then
 			[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
@@ -116,6 +117,7 @@ function bootstrap_install() {
 			__info "sha256 verified for %s" "$project_name"
 		fi
 
+		status=0
 		unzip -q -d "$temporary_directory/extracted" -- "$temporary_directory/archive.zip" || status="$(__abort_on_interrupt "$?")"
 		if (( status != 0 )); then
 			[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
