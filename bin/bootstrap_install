@@ -106,14 +106,17 @@ function bootstrap_install() {
 			local_exit_failsafe
 		fi
 
+		local actual
+		actual="$(sha256sum -- "$temporary_directory/archive.zip" | awk '{print $1}')"
+		__info "sha256 of %s: %s" "$project_name" "$actual"
+
 		if [[ -n "$sha256" ]]; then
-			local actual
-			actual="$(sha256sum -- "$temporary_directory/archive.zip" | awk '{print $1}')"
 			if [[ "$actual" != "$sha256" ]]; then
 				[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
 				__error "sha256 mismatch for %s: expected %s, got %s" "$project_name" "$sha256" "$actual"
 				local_exit_failsafe
 			fi
+
 			__info "sha256 verified for %s" "$project_name"
 		fi
 

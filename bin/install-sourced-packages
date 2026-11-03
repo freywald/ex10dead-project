@@ -722,10 +722,11 @@ function process_requirement() {
 			local_exit_failsafe
 		fi
 
-		# sha256 verification (opt-in)
+		local actual
+		actual="$(sha256sum -- "$zip_temporary" | awk '{print $1}')"
+		__info "sha256 of %s: %s" "$requirement_project" "$actual"
+
 		if [[ -n "${requirement_sha256:-}" ]]; then
-			local actual
-			actual="$(sha256sum -- "$zip_temporary" | awk '{print $1}')"
 			if [[ "$actual" != "$requirement_sha256" ]]; then
 				rm -f -- "$zip_temporary"
 				installation_zip=""
@@ -734,6 +735,7 @@ function process_requirement() {
 				__error "sha256 mismatch for %s: expected %s, got %s" "$requirement_project" "$requirement_sha256" "$actual"
 				local_exit_failsafe
 			fi
+
 			__info "sha256 verified for %s" "$requirement_project"
 		fi
 
