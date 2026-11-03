@@ -24,8 +24,48 @@ if ! declare -p registered_handlers &>"/dev/null"; then
 fi
 
 function bootstrap_install() {
-	local url="$1" destination="$2" project_name="${3-}"
-	local temporary_directory status=0 download_url="$url"
+	local url="$1" destination="$2"
+	shift 2 ||:
+
+	local project_name="" sha256=""
+	while (($# > 0)); do
+		if [[ "$1" == "--project-name" ]]; then
+			if [[ -n "${2-}" && "$2" != --* ]]; then
+				project_name="$2"
+				shift 2 ||:
+			else
+				__error "--project-name requires a value"
+				local_exit_failsafe
+			fi
+		elif [[ "$1" == "--project-name="* ]]; then
+			project_name="${1#"--project-name="}"
+			if [[ -n "$project_name" ]]; then
+				shift ||:
+			else
+				__error "--project-name requires a value"
+				local_exit_failsafe
+			fi
+		elif [[ "$1" == "--sha256" ]]; then
+			if [[ -n "${2-}" && "$2" != --* ]]; then
+				sha256="$2"
+				shift 2 ||:
+			else
+				__error "--sha256 requires a value"
+				local_exit_failsafe
+			fi
+		elif [[ "$1" == "--sha256="* ]]; then
+			sha256="${1#"--sha256="}"
+			if [[ -n "$sha256" ]]; then
+				shift ||:
+			else
+				__error "--sha256 requires a value"
+				local_exit_failsafe
+			fi
+		else
+			__error "unknown argument %s" "$1"
+			local_exit_failsafe
+		fi
+	done
 
 	if [[ -z "$project_name" ]]; then
 		project_name="${url##*/}"
@@ -40,6 +80,8 @@ function bootstrap_install() {
 		local owner="${BASH_REMATCH[1]}" repository="${BASH_REMATCH[2]}"
 		repository="${repository%".git"}"
 		download_url="https://github.com/$owner/$repository/archive/refs/heads/master.zip"
+	else
+		download_url="$url"
 	fi
 
 	printf -v "__${project_name}_library_path" '%s/' "$destination"
@@ -53,6 +95,17 @@ function bootstrap_install() {
 			[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
 			__error "download failed: %s" "$download_url"
 			local_exit_failsafe
+		fi
+
+		if [[ -n "$sha256" ]]; then
+			local actual
+			actual="$(sha256sum -- "$temporary_directory/archive.zip" | awk '{print $1}')"
+			if [[ "$actual" != "$sha256" ]]; then
+				[[ -d "$temporary_directory" ]] && rm --recursive --force -- "$temporary_directory"
+				__error "sha256 mismatch for %s: expected %s, got %s" "$project_name" "$sha256" "$actual"
+				local_exit_failsafe
+			fi
+			__info "sha256 verified for %s" "$project_name"
 		fi
 
 		unzip -q -d "$temporary_directory/extracted" -- "$temporary_directory/archive.zip" || status="$(__abort_on_interrupt "$?")"
@@ -75,6 +128,7 @@ function bootstrap_install() {
 
 - source url: ${url}
 - download url: ${download_url}
+- sha256: ${sha256}
 - install directory: ${destination}
 - installed at: $(date +%d-%m-%Y-%H-%M-%S)
 EOF
@@ -99,7 +153,7 @@ EOF
 			fi
 		else
 			__require_once "$handler"
-        fi
+		fi
 		handler_sourced["$project_name"]=1
 	fi
 }

@@ -17,6 +17,7 @@ branch_primary="master"
 force_installation_all=false
 force_download_newer=false
 update_to_any_depth=false
+update_pinned=false
 
 readonly EXIT_REBOOT=12
 
@@ -27,6 +28,8 @@ declare -A seen=()
 declare -A decided_version=()
 declare -A decided_by=()
 declare -a queue=()
+declare -A pinned_commits=()
+declare -A pinned_urls=()
 
 if ! declare -p installed_paths &>"/dev/null"; then
 	declare -A installed_paths=()
@@ -93,6 +96,7 @@ function parse_requirement() {
 	requirement_download=""
 	requirement_commit=""
 	requirement_explicit=false
+	requirement_sha256=""
 
 	if [[ "$url" =~ ^https://github.com/([^/]+)/([^/]+)(.*)$ ]]; then
 		requirement_kind="github"
@@ -213,12 +217,18 @@ function notify_newer() {
 		__info "newer release %s is available for %s; staying on %s" "$latest_tag" "$requirement_project" "$requirement_tag"
 	fi
 }
+
 function apply_force_download_newer() {
 	! $force_download_newer && return 0
 
 	[[ "$requirement_kind" != "github" || -z "$latest_tag" ]] && return 0
 
 	if [[ -n "$requirement_tag" && "$latest_tag" == "$requirement_tag" ]]; then
+		return 0
+	fi
+
+	# Without --update-pinned, leave explicit tags alone
+	if [[ -n "$requirement_tag" && ! $update_pinned ]]; then
 		return 0
 	fi
 
@@ -237,25 +247,16 @@ function apply_force_download_newer() {
 }
 
 function same_install() {
-	local settings="$target_library_path/installation-settings.markdown"
+	[[ ! -d "$target_library_path" ]] && return 1
 
-	[[ ! -d "$target_library_path" || ! -f "$settings" ]] && return 1
-
-	local installed_url installed_tag installed_commit
-	installed_url="$(settings_value "$settings" "download url")"
-	installed_tag="$(settings_value "$settings" "tag")"
-	installed_commit="$(settings_value "$settings" "commit")"
-
-	if [[ -n "$requirement_tag" ]]; then
-		[[ "$installed_tag" == "$requirement_tag" ]]
-		return $?
-	fi
+	local installed_commit="${pinned_commits["$requirement_project"]-}"
 
 	if [[ -n "$requirement_commit" ]]; then
 		[[ -n "$installed_commit" && "$installed_commit" == "$requirement_commit" ]]
 		return $?
 	fi
 
+	local installed_url="${pinned_urls["$requirement_project"]-}"
 	[[ "$installed_url" == "$requirement_download" ]]
 	return $?
 }
@@ -275,6 +276,8 @@ function record_pin() {
 	printf '# name=%s\n# type=url\n' "$requirement_project" >> "$pinned_partial"
 	[[ "$entry_installation_root" != "$installation_root" ]] && printf '# installation_root=%s\n' "$entry_installation_root" >> "$pinned_partial"
 	[[ "$entry_installation_path" != "library" ]] && printf '# installation_path=%s\n' "$entry_installation_path" >> "$pinned_partial"
+	[[ -n "$requirement_commit" ]] && printf '# commit=%s\n' "$requirement_commit" >> "$pinned_partial"
+	[[ -n "${requirement_sha256:-}" ]] && printf '# sha256=%s\n' "$requirement_sha256" >> "$pinned_partial"
 	printf '%s\n\n' "$requirement_download" >> "$pinned_partial"
 }
 
@@ -346,6 +349,7 @@ function write_installation_settings() {
 - tag: ${requirement_tag}
 - version: ${requirement_version}
 - commit: ${requirement_commit}
+- sha256: ${requirement_sha256:-}
 - download url: ${requirement_download}
 - zip archive: ${archived_zip}
 - install directory: ${destination}
@@ -505,6 +509,7 @@ function process_requirement() {
 		local name type value
 		name="$(get_metadata "name" "$key")" || name=""
 		type="$(get_metadata "type" "$key")" || type=""
+		commit="$(get_metadata "commit" "$key")" || commit=""
 		value="$(get_metadata "_" "$key")" || value=""
 
 		entry_installation_root="$(get_metadata "installation_root" "$key")" || entry_installation_root=""
@@ -557,11 +562,26 @@ function process_requirement() {
 			local_exit_failsafe
 		fi
 
+		[[ -n "$name" ]] && pinned_commits["$name"]="$commit"
+		[[ -n "$name" ]] && pinned_urls["$name"]="$value"
+
 		__info "Requirement: %s" "$value"
 
-		requirement_url="" requirement_kind="" requirement_host="" requirement_owner="" requirement_repository="" requirement_page=""
-		requirement_branch="" requirement_tag="" requirement_version="" requirement_download="" requirement_commit=""
-		requirement_explicit=false latest_tag="" archived_zip=""
+		requirement_url=""
+		requirement_kind=""
+		requirement_host=""
+		requirement_owner=""
+		requirement_repository=""
+		requirement_page=""
+		requirement_branch=""
+		requirement_tag=""
+		requirement_version=""
+		requirement_download=""
+		requirement_commit=""
+		requirement_explicit=false
+		requirement_sha256=""
+		latest_tag=""
+		archived_zip=""
 		requirement_project="$project"
 
 		if ! parse_requirement "$value"; then
@@ -569,11 +589,13 @@ function process_requirement() {
 			local_exit_failsafe
 		fi
 
-		local entry_tag entry_branch
+		local entry_tag entry_branch entry_sha256
 		entry_tag="$(get_metadata "tag" "$key")" || entry_tag=""
 		entry_branch="$(get_metadata "branch" "$key")" || entry_branch=""
+		entry_sha256="$(get_metadata "sha256" "$key")" || entry_sha256=""
 		entry_tag="$(__trim_whitespaces "$entry_tag")"
 		entry_branch="$(__trim_whitespaces "$entry_branch")"
+		entry_sha256="$(__trim_whitespaces "$entry_sha256")"
 
 		if [[ -n "$entry_tag" ]]; then
 			requirement_tag="$entry_tag"
@@ -584,6 +606,7 @@ function process_requirement() {
 			requirement_tag=""
 			requirement_explicit=true
 		fi
+		requirement_sha256="$entry_sha256"
 
 		resolve_download
 
@@ -699,6 +722,21 @@ function process_requirement() {
 			local_exit_failsafe
 		fi
 
+		# sha256 verification (opt-in)
+		if [[ -n "${requirement_sha256:-}" ]]; then
+			local actual
+			actual="$(sha256sum -- "$zip_temporary" | awk '{print $1}')"
+			if [[ "$actual" != "$requirement_sha256" ]]; then
+				rm -f -- "$zip_temporary"
+				installation_zip=""
+				installation_target=""
+				seen["$project"]="failed"
+				__error "sha256 mismatch for %s: expected %s, got %s" "$requirement_project" "$requirement_sha256" "$actual"
+				local_exit_failsafe
+			fi
+			__info "sha256 verified for %s" "$requirement_project"
+		fi
+
 		if ! extract_zip "$zip_temporary" "$target_library_path"; then
 			archive_zip "$zip_temporary" "${project}-failed"
 			installation_zip=""
@@ -785,6 +823,10 @@ function install_package() {
 		elif [[ "$1" == "--force-download-newer" || "$1" == "--update" ]]; then
 			force_download_newer=true
 			shift ||__expression_may_fail
+		elif [[ "$1" == "--update-pinned" ]]; then
+			force_download_newer=true
+			update_pinned=true
+			shift ||__expression_may_fail
 		elif [[ "$1" == "--update-to-any-depth" ]]; then
 			force_download_newer=true
 			update_to_any_depth=true
@@ -852,7 +894,7 @@ function install_package() {
 	if [[ -f "$runtime_file" ]]; then
 		__require_once "$runtime_file"
 		local variable project
-		for variable in ${!__*_library_path}; do
+		for variable in ${!"__"*"_library_path"}; do
 			project="${variable#"__"}"
 			project="${project%"_library_path"}"
 			installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
@@ -861,7 +903,7 @@ function install_package() {
 
 	if [[ -f "$dynamic_file" ]]; then
 		__require_once "$dynamic_file"
-		for variable in ${!__*}; do
+		for variable in ${!"__"*}; do
 			[[ "$variable" != *"_library_path" ]] && continue
 			project="${variable#"__"}"
 			project="${project%"_library_path"}"
@@ -879,6 +921,26 @@ function install_package() {
 			[[ ! -d "$path" ]] && continue
 
 			local settings="$path/installation-settings.markdown"
+			[[ ! -f "$settings" ]] && continue
+
+			local installed_tag installed_branch installed_version installed_url
+			installed_tag="$(settings_value "$settings" "tag")"
+			installed_branch="$(settings_value "$settings" "branch")"
+			installed_version="$(settings_value "$settings" "version")"
+			installed_url="$(settings_value "$settings" "download url")"
+
+			# Leave tagged and explicit-version installs alone unless --update-pinned is set
+			if ! $update_pinned; then
+				[[ -n "$installed_tag" || -n "$installed_version" ]] && continue
+			fi
+
+			# Eligible only if it looks like a primary-branch (or branch) install
+			if [[ -z "$installed_branch" ]]; then
+				[[ "$installed_url" != *"/heads/${branch_primary}.zip"* ]] && continue
+				installed_branch="$branch_primary"
+			fi
+			[[ "$installed_branch" != "$branch_primary" ]] && continue
+
 			local installed_commit=""
 			[[ -f "$settings" ]] && installed_commit="$(settings_value "$settings" "commit")"
 
@@ -905,6 +967,7 @@ function install_package() {
 - source url: ${page}
 - download url: ${download_url}
 - commit: ${commit}
+- branch: ${branch_primary}
 - install directory: ${path}
 - installed at: $(date +%d-%m-%Y-%H-%M-%S)
 EOF
@@ -914,9 +977,8 @@ EOF
 
 	if $rebooted; then
 		__info "bootstrapped libraries updated, reboot required"
-		exit "$EXIT_REBOOT"
+		return "$EXIT_REBOOT"
 	fi
-
 
 	mkdir --parents -- "$zip_archive_directory" "$installation_archive_directory" "$(dirname -- "$dynamic_file")"
 
@@ -946,6 +1008,12 @@ EOF
 
 		process_requirement "$file" "$depth" "$requester"
 	done
+
+		# Merge bootstrapped.dynamic into the normal dynamic file, then remove it
+		if [[ -f "$runtime_file" ]]; then
+			grep -E '^__[A-Za-z0-9_]+_library_path=' "$runtime_file" >> "$dynamic_partial" || true
+			rm -f -- "$runtime_file"
+		fi
 
 	mv -f -- "$dynamic_partial" "$dynamic_file"
 	if [[ -s "$pinned_partial" ]]; then
