@@ -262,6 +262,10 @@ function same_install() {
 }
 
 function record_library() {
+	if grep -q -- "^__${requirement_project}_library_path=" "$dynamic_partial"; then
+		return 0
+	fi
+
 	if [[ -n "$requirement_version" ]]; then
 		printf '# version="%s"\n' "$requirement_version" >> "$dynamic_partial"
 	elif [[ -n "$requirement_tag" ]]; then
@@ -641,6 +645,7 @@ function process_requirement() {
 			if [[ -d "$target_library_path/" ]]; then
 				__info "already installed at %s, skipping %s" "$target_library_path" "$project"
 
+				record_pin
 				record_library
 				seen["$project"]="installed"
 
