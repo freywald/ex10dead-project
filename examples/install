@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# configuration start
+
+source -- "$(dirname -- "$0")/install.configuration"
+
+# configuration end
+
+function local_exit_failsafe() { __exit_failsafe; exit 1; }
+
+# script task start
+
+update=false
+
+arguments=()
+while (($# > 0 )); do
+	if [[ "$1" == "--update"* || "$1" == "--force-install-all" ]]; then
+		update=true
+		arguments+=("$1")
+		shift ||__expression_may_fail
+	elif [[ "$1" == "--print" || "$1" == "--print-sources" ]]; then
+		arguments+=("$1")
+		shift ||__expression_may_fail
+	else
+		arguments+=("$1")
+		shift ||__expression_may_fail
+	fi
+done
+
+set -- "${arguments[@]}"
+
+function __repeat() {
+	local string="$1"
+	local n="$2"
+
+	for (( i=0; i<n; i++)); do
+		echo -n "$string"
+	done
+
+	echo
+}
+
+# @source: https://stackoverflow.com/questions/59895/how-do-i-get-the-directory-where-a-bash-script-is-located-from-within-the-script
+function __set_script_path() {
+	local former_directory
+	former_directory="$(pwd)"
+
+	local up_levels="${1:-0}"
+
+	local source="${BASH_SOURCE[-1]}"
+	while [[ -L "$source" ]]; do # resolve $source until the file is no longer a symlink
+		local directory
+		directory="$(cd -P "$(dirname -- "$source")" > "/dev/null" 2>&1 && pwd)"
+		source="$(readlink -- "$source")"
+		[[ "$source" != /* ]] && source="$directory/$source" # if $source was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+	done
+
+	local levels
+	levels="$(__repeat "../" "$up_levels")../"
+
+	__script_path="$(cd -P "$(dirname -- "$source")/$levels" > "/dev/null" 2>&1 && pwd)"
+	cd -- "$former_directory" || exit 1
+
+	export __script_path
+}
+
+__set_script_path "$script_path_level" || exit 1
+
+bootstrap_file="$installation_root/bootstrap_install"
+
+if $update && [[ -f "$bootstrap_file" ]]; then
+	rm -rf -- "$bootstrap_file" || exit 1
+fi
+if [[ ! -f "$bootstrap_file" ]]; then
+	wget --quiet --output-document "$bootstrap_file" -- "$bootstrap_file_url" || exit 1
+fi
+
+actual="$(sha256sum -- "$bootstrap_file" | awk '{print $1}')" || exit 1
+if [[ "$actual" != "$bootstrap_file_sha256" ]]; then
+	printf "sha256 mismatch for %s: expected %s, got %s\n" "$bootstrap_file" "$bootstrap_file_sha256" "$actual"
+	exit 1
+fi
+
+printf "sha256 verified for %s\n" "$bootstrap_file"
+source -- "$bootstrap_file" || exit 1
+
+bootstrap_install "$ex10dead_common_library_url" "$installation_root/core-library/" --sha256="$ex10dead_common_library_sha256" || exit 1
+
+printf "sha256 verified for %s\n" "$__ex10dead_common_library_library_path/library/common"
+source -- "$__ex10dead_common_library_library_path/library/common" || exit 1
+
+__set_script_path "$script_path_level" || exit 1
+__enable_error_handler || exit 1
+
+bootstrap_install "$ex10dead_project_url" "$installation_root/core-library/" --sha256="$ex10dead_project_sha256"|| exit 1
+
+printf "sha256 verified for %s\n" "./$__ex10dead_project_library_path/bin/install-sourced-packages"
+source -- "./$__ex10dead_project_library_path/bin/install-sourced-packages" || exit 1
+
+status=0
+install_package --installation-root="$installation_root" "$@" || status=$?
+if (( status == 12 )); then
+	status=0
+	install_package --installation-root="$installation_root" "$@" || status=$?
+fi
+
+exit "$status"

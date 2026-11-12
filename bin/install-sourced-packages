@@ -64,8 +64,17 @@ function unique_destination() {
 function version_from_text() {
 	local text="$1"
 	local version=""
+
+	# Prefer an explicit tag-like token (optional leading v, semver-ish, optional pre-release)
+	# Stops at the first non-version character that is not part of a pre-release suffix.
 	if [[ "$text" =~ (^|[^A-Za-z0-9])(v?[0-9]+([.][0-9]+){1,3}([-.][A-Za-z0-9]+)*)([^A-Za-z0-9]|$) ]]; then
 		version="${BASH_REMATCH[2]}"
+		# Strip a trailing non-version character that the regex may have included
+		version="${version%%[^A-Za-z0-9.-]*}"
+		# Reject pure numbers that are too short to be versions (e.g. just "1")
+		if [[ ! "$version" =~ [.] ]]; then
+			version=""
+		fi
 	fi
 
 	printf '%s\n' "$version"
@@ -108,8 +117,15 @@ function parse_requirement() {
 		local rest="${BASH_REMATCH[3]}"
 		rest="${rest%"/"}"
 		if [[ "$rest" =~ ^/tree/(.+)$ ]]; then
-			requirement_branch="${BASH_REMATCH[1]}"
-			requirement_explicit=true
+			local ref="${BASH_REMATCH[1]}"
+			# 7–40 hex chars = commit SHA (full or abbreviated)
+			if [[ "$ref" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+				requirement_commit="$ref"
+				requirement_explicit=true
+			else
+				requirement_branch="$ref"
+				requirement_explicit=true
+			fi
 		elif [[ "$rest" =~ ^/archive/refs/heads/(.+)[.]zip$ ]]; then
 			requirement_branch="${BASH_REMATCH[1]}"
 			requirement_explicit=true
@@ -161,9 +177,20 @@ function branch_commit() {
 }
 
 function resolve_download() {
+	local saved_commit="$requirement_commit"
 	requirement_commit=""
 	latest_tag=""
+
 	if [[ "$requirement_kind" == "zip" ]]; then
+		return 0
+	fi
+
+	if [[ -n "$saved_commit" ]]; then
+		requirement_commit="$saved_commit"
+		requirement_download="$requirement_page/archive/$requirement_commit.zip"
+		local full
+		full="$(git ls-remote "$requirement_page.git" "$requirement_commit" 2>"/dev/null" | awk '{print $1; exit}')"
+		[[ -n "$full" ]] && requirement_commit="$full"
 		return 0
 	fi
 
@@ -273,7 +300,8 @@ function record_library() {
 	elif [[ -n "$requirement_branch" ]]; then
 		printf '# version="%s"\n' "$requirement_branch" >> "$dynamic_partial"
 	fi
-	printf '__%s_library_path="%s/"\n' "$requirement_project" "$target_library_path" >> "$dynamic_partial"
+
+	printf '__%s_library_path="%s/"\n' "$requirement_project" "${target_library_path%/}" >> "$dynamic_partial"
 }
 
 function record_pin() {
@@ -905,7 +933,7 @@ function install_package() {
 			[[ "$variable" != *"_library_path" ]] && continue
 			project="${variable#"__"}"
 			project="${project%"_library_path"}"
-			installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+			installed_paths["$project"]="$(__normalize_path_slashes "${!variable%/}")"
 		done
 	fi
 
@@ -916,7 +944,7 @@ function install_package() {
 			project="${variable#"__"}"
 			project="${project%"_library_path"}"
 			if [[ -z "${installed_paths["$project"]-}" ]]; then
-				installed_paths["$project"]="$(__normalize_path_slashes "${!variable}")"
+				installed_paths["$project"]="$(__normalize_path_slashes "${!variable%/}")"
 			fi
 		done
 	fi
@@ -1017,11 +1045,21 @@ EOF
 		process_requirement "$file" "$depth" "$requester"
 	done
 
-		# Merge bootstrapped.dynamic into the normal dynamic file, then remove it
-		if [[ -f "$runtime_file" ]]; then
-			grep -E '^__[A-Za-z0-9_]+_library_path=' "$runtime_file" >> "$dynamic_partial" || true
-			rm -f -- "$runtime_file"
-		fi
+	# Merge bootstrapped.dynamic into the normal dynamic file, then remove it
+	if [[ -f "$runtime_file" ]]; then
+		local line project
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			# Extract project name from __PROJECT_library_path=…
+			if [[ "$line" =~ ^__([A-Za-z0-9_]+)_library_path= ]]; then
+				project="${BASH_REMATCH[1]}"
+				# Only append if this project is not already recorded
+				if ! grep -q -- "^__${project}_library_path=" "$dynamic_partial"; then
+					printf '%s\n' "$line" >> "$dynamic_partial"
+				fi
+			fi
+		done < "$runtime_file"
+		rm -f -- "$runtime_file"
+	fi
 
 	mv -f -- "$dynamic_partial" "$dynamic_file"
 	if [[ -s "$pinned_partial" ]]; then

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# configuration start
+
+bootstrap_file_sha256="1b7762c2b42e3c59bd89291e79581a3479498a4e5330ddc370296ff8f926937a"
+ex10dead_common_library_sha256="3e3ee27d59b5f44d69543dca06d99278293f71501e5fc14905f98ad73f5eb3f7"
+ex10dead_project_sha256="7b947196ce3ebfbcc7a29eaa95d1d4156f1738a9e94798030f26a53e4316b3cb"
+
+bootstrap_file_url="https://github.com/freywald/ex10dead-project/blob/ba22ac42af062307ee59642107219581b53c8266/bin/bootstrap_install"
+ex10dead_common_library_url="https://github.com/freywald/ex10dead-common-library/tree/deeb2b515981d5b997a8172f644c2775ca38a1d5"
+ex10dead_project_url="https://github.com/freywald/ex10dead-project/tree/ba22ac42af062307ee59642107219581b53c8266"
+
+script_path_level=0
+
+installation_root="examples/packages/"
+
+# configuration end
