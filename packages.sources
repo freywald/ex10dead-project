@@ -1,0 +1,11 @@
+# name=ex10dead_common_library
+# _type=package
+https://github.com/freywald/ex10dead-common-library
+
+# name=desynchronizer
+# _type=package
+https://github.com/freywald/desynchronizer
+
+# name=shell-discouraged-mispackager
+# _type=package
+https://github.com/freywald/shell-discouraged-mispackager
