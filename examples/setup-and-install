@@ -2,13 +2,13 @@
 
 # configuration start
 
-source -- "$(dirname -- "$0")/../../bin/package.configuration"
+source -- "$(dirname -- "$0")/../../bin/configuration"
 
 # configuration end
 
 # script task start
 
-project_file="$installation_root/core-library/ex10dead_project/scripts/install"
+project_file="$installation_root/core-package/ex10dead_project/scripts/install"
 mkdir --parents -- "$(dirname -- "$project_file")" || exit 1
 
 if [[ ! -f "$project_file" || ! -s "$project_file" ]]; then

@@ -76,7 +76,8 @@ function initialize_project() {
 	touch -- "$installation_root/FLAG_IS_MISPACKAGED" || exit 1
 	cp -- "Installer/packages.sources" "$installation_root/packages.sources" || exit 1
 
-	bootstrap_inject_file="$installation_root/bootstrap_inject_package"
+	bootstrap_inject_file="$installation_root/core-package/shell_discouraged_mispackager/bin/bootstrap_inject_package"
+	mkdir --parents -- "$(dirname -- "$bootstrap_inject_file")" || exit 1
 
 	if $update && [[ -f "$bootstrap_inject_file" ]]; then
 		rm -rf -- "$bootstrap_inject_file" || exit 1
@@ -106,7 +107,8 @@ function initialize_project() {
 	__set_script_path "$script_path_level" || exit 1
 	__enable_error_handler || exit 1
 
-	bootstrap_inject_package "$shell_discouraged_mispackager_url" "$installation_root/core-package/" --sha256="$shell_discouraged_mispackager_sha256"|| exit 1
+	bootstrap_inject_package "$shell_discouraged_mispackager_url" "$installation_root/core-package/" --sha256="$shell_discouraged_mispackager_sha256" || exit 1
+	source -- "$__shell_discouraged_mispackager_package_path/bin/bootstrap_inject_package"
 
 	printf "sha256 verified for %s\n" "./$__shell_discouraged_mispackager_package_path/bin/install-discouraged-packages"
 
