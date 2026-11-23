@@ -63,7 +63,14 @@ function initialize_project() {
 
 	set -- "${arguments[@]}"
 
+	__set_script_path "0" || exit 1
+	source -- "$__script_path/install.configuration"
+
 	__set_script_path "$script_path_level" || exit 1
+
+	echo "script_path_level=$script_path_level"
+	echo "__script_path=$__script_path"
+	exit
 
 	mkdir --parents -- "$installation_root" || exit 1
 	touch -- "$installation_root/FLAG_IS_MISPACKAGED" || exit 1
