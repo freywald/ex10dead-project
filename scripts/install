@@ -82,7 +82,7 @@ function initialize_project() {
 		rm -rf -- "$bootstrap_file" || exit 1
 	fi
 	if [[ ! -f "$bootstrap_file" ]]; then
-		wget --quiet --output-document "$bootstrap_file" -- "$bootstrap_file_url" || exit 1
+		wget --quiet --output-document "$bootstrap_file" -- "$bootstrap_inject_file_url" || exit 1
 	fi
 
 	if [[ -n "$bootstrap_file_sha256" ]]; then

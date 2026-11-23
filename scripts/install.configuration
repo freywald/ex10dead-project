@@ -2,12 +2,12 @@
 
 # configuration start
 
-bootstrap_file_sha256="84a133876e304b0eb8e9df6f4d8165654d86f77f88b4963e4d69e7beecd01587"
+bootstrap_file_sha256="c5eb44e68467a88d1af64964a7c650b9ce372b17caad4e61981cc889d3767c0d"
 ex10dead_common_library_sha256="3e3ee27d59b5f44d69543dca06d99278293f71501e5fc14905f98ad73f5eb3f7"
 shell_discouraged_mispackager_sha256="2ab439609ae805fe6d8faf64cec3f612a70e22eec63f660e95c7c9110c0f7510"
 
-bootstrap_file_url="https://raw.githubusercontent.com/freywald/shell-discouraged-mispackager/41d72ac0eed5b6bf7a6ade0f6e11c349451c35a9/bin/bootstrap_install"
-#bootstrap_file_url=""
+bootstrap_inject_file_url="https://raw.githubusercontent.com/freywald/shell-discouraged-mispackager/refs/heads/master/bin/bootstrap_inject_package"
+#bootstrap_inject_file_url="https://raw.githubusercontent.com/freywald/shell-discouraged-mispackager/41d72ac0eed5b6bf7a6ade0f6e11c349451c35a9/bin/bootstrap_install"
 
 ex10dead_common_library_url="https://github.com/freywald/ex10dead-common-library"
 #ex10dead_common_library_url="https://github.com/freywald/ex10dead-common-library/tree/deeb2b515981d5b997a8172f644c2775ca38a1d5"
