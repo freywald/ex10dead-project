@@ -1,0 +1,10 @@
+#!/bin/bash
+
+ex10dead_project_sha256=""
+
+ex10dead_project_install_url="https://raw.githubusercontent.com/freywald/ex10dead-project/refs/heads/master/scripts/install"
+#ex10dead_project_install_url="https://github.com/freywald/ex10dead-project/41d72ac0eed5b6bf7a6ade0f6e11c349451c35a9/scripts/install"
+
+installation_root="Build/packages/"
+
+script_path_level=1

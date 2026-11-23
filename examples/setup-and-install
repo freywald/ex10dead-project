@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# configuration start
+
+source -- "$(dirname -- "$0")/../../bin/package.configuration"
+
+# configuration end
+
+# script task start
+
+project_file="$installation_root/core-library/ex10dead_project/scripts/install"
+mkdir --parents -- "$(dirname -- "$project_file")" || exit 1
+
+if [[ ! -f "$project_file" || ! -s "$project_file" ]]; then
+	curl --fail --location --retry 3 --retry-delay 2 --output "$project_file" -- "$ex10dead_project_install_url" || exit 1
+fi
+
+if [[ -n "$project_file_sha256" ]]; then
+	actual="$(sha256sum -- "$project_file" | awk '{print $1}')" || exit 1
+	if [[ "$actual" != "$project_file_sha256" ]]; then
+		printf "sha256 mismatch for %s: expected %s, got %s\n" "$project_file" "$project_file_sha256" "$actual"
+		exit 1
+	fi
+	printf "sha256 verified for %s\n" "$project_file"
+fi
+
+source -- "$project_file" || exit 1
+initialize_project "$@"
