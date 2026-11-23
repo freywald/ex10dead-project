@@ -76,25 +76,25 @@ function initialize_project() {
 	touch -- "$installation_root/FLAG_IS_MISPACKAGED" || exit 1
 	cp -- "Installer/packages.sources" "$installation_root/packages.sources" || exit 1
 
-	bootstrap_file="$installation_root/bootstrap_inject_package"
+	bootstrap_inject_file="$installation_root/bootstrap_inject_package"
 
-	if $update && [[ -f "$bootstrap_file" ]]; then
-		rm -rf -- "$bootstrap_file" || exit 1
+	if $update && [[ -f "$bootstrap_inject_file" ]]; then
+		rm -rf -- "$bootstrap_inject_file" || exit 1
 	fi
-	if [[ ! -f "$bootstrap_file" ]]; then
-		wget --quiet --output-document "$bootstrap_file" -- "$bootstrap_inject_file_url" || exit 1
+	if [[ ! -f "$bootstrap_inject_file" ]]; then
+		wget --quiet --output-document "$bootstrap_inject_file" -- "$bootstrap_inject_file_url" || exit 1
 	fi
 
-	if [[ -n "$bootstrap_file_sha256" ]]; then
-		actual="$(sha256sum -- "$bootstrap_file" | awk '{print $1}')" || exit 1
-		if [[ "$actual" != "$bootstrap_file_sha256" ]]; then
-			printf "sha256 mismatch for %s: expected %s, got %s\n" "$bootstrap_file" "$bootstrap_file_sha256" "$actual"
+	if [[ -n "$bootstrap_inject_file_sha256" ]]; then
+		actual="$(sha256sum -- "$bootstrap_inject_file" | awk '{print $1}')" || exit 1
+		if [[ "$actual" != "$bootstrap_inject_file_sha256" ]]; then
+			printf "sha256 mismatch for %s: expected %s, got %s\n" "$bootstrap_inject_file" "$bootstrap_inject_file_sha256" "$actual"
 			exit 1
 		fi
-		printf "sha256 verified for %s\n" "$bootstrap_file"
+		printf "sha256 verified for %s\n" "$bootstrap_inject_file"
 	fi
 
-	source -- "$bootstrap_file" || exit 1
+	source -- "$bootstrap_inject_file" || exit 1
 
 	bootstrap_inject_package "$ex10dead_common_library_url" "$installation_root/core-library/" --sha256="$ex10dead_common_library_sha256" || exit 1
 
