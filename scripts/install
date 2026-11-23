@@ -63,14 +63,14 @@ function initialize_project() {
 
 	set -- "${arguments[@]}"
 
-	__set_script_path "0" || exit 1
-	source -- "$__script_path/install.configuration"
+	project_file_configuration="$installation_root/core-library/ex10dead_project/scripts/install.configuration"
+
+	if [[ ! -f "$project_file_configuration" || ! -s "$project_file_configuration" ]]; then
+		curl --fail --location --output "$project_file_configuration" -- "$ex10dead_project_install_url.configuration" || exit 1
+	fi
+	source -- "$project_file_configuration" || exit 1
 
 	__set_script_path "$script_path_level" || exit 1
-
-	echo "script_path_level=$script_path_level"
-	echo "__script_path=$__script_path"
-	exit
 
 	mkdir --parents -- "$installation_root" || exit 1
 	touch -- "$installation_root/FLAG_IS_MISPACKAGED" || exit 1
