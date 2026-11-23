@@ -63,7 +63,7 @@ function initialize_project() {
 
 	set -- "${arguments[@]}"
 
-	project_file_configuration="$installation_root/core-library/ex10dead_project/scripts/install.configuration"
+	project_file_configuration="$installation_root/core-package/ex10dead_project/scripts/install.configuration"
 
 	if [[ ! -f "$project_file_configuration" || ! -s "$project_file_configuration" ]]; then
 		curl --fail --location --retry 3 --retry-delay 2 --output "$project_file_configuration" -- "$ex10dead_project_install_url.configuration" || exit 1
@@ -96,33 +96,33 @@ function initialize_project() {
 
 	source -- "$bootstrap_inject_file" || exit 1
 
-    bootstrap_inject_package "$ex10dead_project_url" "$installation_root/core-library/" --sha256="$ex10dead_project_sha256" || exit 1
+    bootstrap_inject_package "$ex10dead_project_url" "$installation_root/core-package/" --sha256="$ex10dead_project_sha256" || exit 1
 
-	bootstrap_inject_package "$ex10dead_common_library_url" "$installation_root/core-library/" --sha256="$ex10dead_common_library_sha256" || exit 1
+	bootstrap_inject_package "$ex10dead_common_library_url" "$installation_root/core-package/" --sha256="$ex10dead_common_library_sha256" || exit 1
 
-	printf "sha256 verified for %s\n" "$__ex10dead_common_library_library_path/library/common"
-	source -- "$__ex10dead_common_library_library_path/library/common" || exit 1
+	printf "sha256 verified for %s\n" "$__ex10dead_common_library_package_path/library/common"
+	source -- "$__ex10dead_common_library_package_path/library/common" || exit 1
 
 	__set_script_path "$script_path_level" || exit 1
 	__enable_error_handler || exit 1
 
-	bootstrap_inject_package "$shell_discouraged_mispackager_url" "$installation_root/core-library/" --sha256="$shell_discouraged_mispackager_sha256"|| exit 1
+	bootstrap_inject_package "$shell_discouraged_mispackager_url" "$installation_root/core-package/" --sha256="$shell_discouraged_mispackager_sha256"|| exit 1
 
-	printf "sha256 verified for %s\n" "./$__shell_discouraged_mispackager_library_path/bin/install-discouraged-packages"
+	printf "sha256 verified for %s\n" "./$__shell_discouraged_mispackager_package_path/bin/install-discouraged-packages"
 
 	status=0
 	(
-		source -- "$__shell_discouraged_mispackager_library_path/bin/install-discouraged-packages" || exit 1
+		source -- "$__shell_discouraged_mispackager_package_path/bin/install-discouraged-packages" || exit 1
 		install_package --installation-root="$installation_root" "$@"
 	) || status=$?
 	if (( status == 12 )); then
 		status=0
 		(
-			source -- "$__ex10dead_common_library_library_path/library/common" || exit 1
+			source -- "$__ex10dead_common_library_package_path/library/common" || exit 1
 			__set_script_path "$script_path_level" || exit 1
 			__enable_error_handler || exit 1
 
-			source -- "$__shell_discouraged_mispackager_library_path/bin/install-discouraged-packages" || exit 1
+			source -- "$__shell_discouraged_mispackager_package_path/bin/install-discouraged-packages" || exit 1
 			install_package --installation-root="$installation_root" "$@"
 		) || status=$?
 	fi
