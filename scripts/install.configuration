@@ -2,10 +2,10 @@
 
 # configuration start
 
-bootstrap_inject_file_sha256="f1233fc1bd27aa0cd5dff872e5ec5198b9dfdbc11126b823eb563fcac507ce9a"
+bootstrap_inject_file_sha256="b4b1159658a63d1964eae240e720027bc72d1da6afe541f3cc2def330f6c584c"
 ex10dead_project_sha256=""
 ex10dead_common_library_sha256="495b46d24477c2b42df95f865983888d721ce10cfac60e7ff4c68a8842db5593"
-shell_discouraged_mispackager_sha256="453687fb038dcc2c3222523842ca2216c98c51d7f13be9d4eba433ba32eed51b"
+shell_discouraged_mispackager_sha256="c91261ae4dcf5f0058fc6535ef3b058a0a28cd38c6da25704e5b53fbc1c24561"
 
 ex10dead_project_url="https://github.com/freywald/ex10dead-project"
 
